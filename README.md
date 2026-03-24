@@ -66,6 +66,37 @@ The installer is written to:
 release/Lookout-Setup-0.1.0.exe
 ```
 
+## GitHub Releases And App Updates
+
+Lookout is configured to publish Windows releases to GitHub Releases and consume them in-app through `electron-updater`.
+
+### Release flow
+
+1. Update `package.json` with the next version.
+2. Commit and push `main`.
+3. Create and push a tag:
+
+```powershell
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+4. GitHub Actions runs `.github/workflows/release.yml` and publishes:
+   - `Lookout-Setup-x.y.z.exe`
+   - `latest.yml`
+   - blockmap files
+
+Installed copies of Lookout can then:
+- check GitHub Releases for updates
+- download the latest installer in-app
+- restart to install the update
+
+### Notes
+
+- Auto-update works in packaged builds, not `npm run dev`.
+- The app is configured for the public GitHub repo `cwbrandsdal/lookout`.
+- Windows code signing is still recommended for the best SmartScreen and installer trust experience.
+
 ## Verification
 
 ```powershell

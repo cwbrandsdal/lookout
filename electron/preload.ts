@@ -5,6 +5,10 @@ import type { LookoutApi } from '../src/types/electron-api';
 const api: LookoutApi = {
   loadAppState: () => ipcRenderer.invoke('lookout:load-state'),
   saveAppState: (state) => ipcRenderer.invoke('lookout:save-state', state),
+  getAppUpdateState: () => ipcRenderer.invoke('lookout:get-app-update-state'),
+  checkForAppUpdates: () => ipcRenderer.invoke('lookout:check-for-app-updates'),
+  downloadAppUpdate: () => ipcRenderer.invoke('lookout:download-app-update'),
+  installAppUpdate: () => ipcRenderer.invoke('lookout:install-app-update'),
   listLocalFonts: () => ipcRenderer.invoke('lookout:list-local-fonts'),
   pickDirectory: (initialPath) => ipcRenderer.invoke('lookout:pick-directory', initialPath),
   validateDirectory: (inputPath) => ipcRenderer.invoke('lookout:validate-directory', inputPath),
@@ -17,6 +21,11 @@ const api: LookoutApi = {
   writeTerminalData: (sessionId, data) => ipcRenderer.invoke('lookout:write-terminal', { sessionId, data }),
   resizeTerminalSession: (sessionId, cols, rows) =>
     ipcRenderer.invoke('lookout:resize-terminal', { sessionId, cols, rows }),
+  onAppUpdateState: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload as never);
+    ipcRenderer.on('lookout:app-update-state', listener);
+    return () => ipcRenderer.removeListener('lookout:app-update-state', listener);
+  },
   onTerminalEvent: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload as never);
     ipcRenderer.on('lookout:terminal-event', listener);

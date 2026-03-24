@@ -3,6 +3,12 @@ import { ArrowLeft, MonitorCog } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useAppStore } from '../store/useAppStore';
+import type { AppUpdateState } from '../types/electron-api';
+
+const DEFAULT_UPDATE_STATE: AppUpdateState = {
+  phase: 'unsupported',
+  currentVersion: '0.0.0',
+};
 
 export function SettingsView() {
   const { settings, updateSettings, setView, activeSpaceId } = useAppStore(
@@ -15,6 +21,7 @@ export function SettingsView() {
   );
   const [availableFonts, setAvailableFonts] = useState<string[]>([]);
   const [fontStatus, setFontStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [updateState, setUpdateState] = useState<AppUpdateState>(DEFAULT_UPDATE_STATE);
 
   useEffect(() => {
     let isMounted = true;
@@ -51,6 +58,27 @@ export function SettingsView() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    void window.lookout.getAppUpdateState().then((state) => {
+      if (isMounted) {
+        setUpdateState(state);
+      }
+    });
+
+    const unsubscribe = window.lookout.onAppUpdateState((state) => {
+      if (isMounted) {
+        setUpdateState(state);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
   const fontOptions = useMemo(() => {
     if (!settings.terminalFontFace.trim()) {
       return availableFonts;
@@ -67,8 +95,8 @@ export function SettingsView() {
         <div className="settings-panel__header">
           <div>
             <span className="eyebrow">Settings</span>
-            <h1>Terminal appearance</h1>
-            <p>Change the default font used by all terminal panes.</p>
+            <h1>App settings</h1>
+            <p>Manage updates and terminal appearance.</p>
           </div>
           <button
             className="button button--ghost button--compact"
@@ -79,6 +107,56 @@ export function SettingsView() {
             Back
           </button>
         </div>
+
+        <section className="settings-update">
+          <div className="settings-update__copy">
+            <span className="eyebrow">Updates</span>
+            <strong>
+              Lookout {updateState.currentVersion}
+              {updateState.availableVersion ? ` -> ${updateState.availableVersion}` : ''}
+            </strong>
+            <p>{describeUpdateState(updateState)}</p>
+          </div>
+
+          <div className="settings-update__actions">
+            <button
+              className="button button--secondary button--compact"
+              disabled={updateState.phase === 'checking' || updateState.phase === 'downloading'}
+              onClick={() => void window.lookout.checkForAppUpdates()}
+              type="button"
+            >
+              Check for updates
+            </button>
+            {updateState.phase === 'available' ? (
+              <button className="button button--primary button--compact" onClick={() => void window.lookout.downloadAppUpdate()} type="button">
+                Download update
+              </button>
+            ) : null}
+            {updateState.phase === 'downloaded' ? (
+              <button className="button button--primary button--compact" onClick={() => void window.lookout.installAppUpdate()} type="button">
+                Restart to install
+              </button>
+            ) : null}
+          </div>
+        </section>
+
+        {updateState.phase === 'downloading' ? (
+          <div className="settings-update__progress">
+            <div className="settings-update__progress-bar">
+              <span style={{ width: `${Math.max(0, Math.min(100, updateState.percent ?? 0))}%` }} />
+            </div>
+            <p>
+              Downloading {formatPercent(updateState.percent)}{updateState.bytesPerSecond ? ` at ${formatBytes(updateState.bytesPerSecond)}/s` : ''}
+            </p>
+          </div>
+        ) : null}
+
+        {updateState.releaseNotes ? (
+          <div className="settings-update__notes glass-card">
+            <span className="eyebrow">Release Notes</span>
+            <pre>{updateState.releaseNotes}</pre>
+          </div>
+        ) : null}
 
         <div className="settings-grid">
           <label className="field">
@@ -177,4 +255,48 @@ export function SettingsView() {
       </div>
     </section>
   );
+}
+
+function describeUpdateState(updateState: AppUpdateState): string {
+  switch (updateState.phase) {
+    case 'idle':
+      return 'Ready to check GitHub Releases for new versions.';
+    case 'unsupported':
+      return updateState.error ?? 'Updates are available only in packaged builds.';
+    case 'checking':
+      return 'Checking GitHub Releases for a newer version.';
+    case 'available':
+      return `Version ${updateState.availableVersion ?? 'unknown'} is available.`;
+    case 'not-available':
+      return 'You are already on the latest published version.';
+    case 'downloading':
+      return `Downloading ${updateState.availableVersion ?? 'the latest update'}.`;
+    case 'downloaded':
+      return 'Update downloaded. Restart the app to install it.';
+    case 'error':
+      return updateState.error ?? 'Update check failed.';
+    default:
+      return 'Update state unavailable.';
+  }
+}
+
+function formatPercent(value: number | undefined): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '0%';
+  }
+
+  return `${value.toFixed(1)}%`;
+}
+
+function formatBytes(value: number): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let current = value;
+  let unitIndex = 0;
+
+  while (current >= 1024 && unitIndex < units.length - 1) {
+    current /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${current.toFixed(current >= 100 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }

@@ -14,6 +14,7 @@
     "dev:electron": "node ./scripts/dev-electron.mjs",
     "build": "tsc -b && tsc -p tsconfig.electron.json --noEmit && vite build && node ./scripts/build-electron.mjs",
     "dist:win": "npm run build && electron-builder --win nsis",
+    "release:win": "npm run build && electron-builder --win nsis --publish always",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "electron ."
@@ -21,6 +22,7 @@
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "electron-updater": "^6.8.3",
     "lucide-react": "^1.0.1",
     "node-pty": "^1.1.0",
     "react": "^19.2.4",
@@ -81,6 +83,13 @@
       ],
       "artifactName": "Lookout-Setup-${version}.${ext}"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "cwbrandsdal",
+        "repo": "lookout"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

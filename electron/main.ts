@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import path from 'node:path';
@@ -7,13 +8,19 @@ import { promisify } from 'node:util';
 import { loadPersistedState, savePersistedState } from './persistence';
 import { PtySessionManager } from './pty-session-manager';
 import { sanitizePersistedState, type PersistedAppState, type TerminalLaunchRequest, type WindowStateSnapshot } from '../src/types/app';
+import type { AppUpdateState } from '../src/types/electron-api';
 
 let mainWindow: BrowserWindow | null = null;
 let ptyManager: PtySessionManager | null = null;
 let persistedStateCache: PersistedAppState | null = null;
 let persistedStateWarnings: string[] = [];
 let ipcRegistered = false;
+let updaterConfigured = false;
 const execFileAsync = promisify(execFile);
+let appUpdateState: AppUpdateState = {
+  phase: 'unsupported',
+  currentVersion: app.getVersion(),
+};
 
 async function bootstrap(): Promise<void> {
   const loadResult = await loadPersistedState();
@@ -24,6 +31,7 @@ async function bootstrap(): Promise<void> {
   ptyManager = new PtySessionManager(() => mainWindow);
 
   registerIpcHandlers();
+  configureAutoUpdater();
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -62,6 +70,10 @@ function createMainWindow(windowState: WindowStateSnapshot): BrowserWindow {
 
   window.on('closed', () => {
     mainWindow = null;
+  });
+
+  window.webContents.on('did-finish-load', () => {
+    emitAppUpdateState();
   });
 
   return window;
@@ -118,6 +130,46 @@ function registerIpcHandlers(): void {
 
     persistedStateCache = mergedState;
     await savePersistedState(mergedState);
+  });
+
+  ipcMain.handle('lookout:get-app-update-state', async () => appUpdateState);
+
+  ipcMain.handle('lookout:check-for-app-updates', async () => {
+    if (!app.isPackaged) {
+      updateAppUpdateState({
+        phase: 'unsupported',
+        currentVersion: app.getVersion(),
+        error: 'App updates are only available in packaged builds.',
+      });
+      return appUpdateState;
+    }
+
+    await autoUpdater.checkForUpdates();
+    return appUpdateState;
+  });
+
+  ipcMain.handle('lookout:download-app-update', async () => {
+    if (!app.isPackaged) {
+      updateAppUpdateState({
+        phase: 'unsupported',
+        currentVersion: app.getVersion(),
+        error: 'App updates are only available in packaged builds.',
+      });
+      return appUpdateState;
+    }
+
+    await autoUpdater.downloadUpdate();
+    return appUpdateState;
+  });
+
+  ipcMain.handle('lookout:install-app-update', async () => {
+    if (appUpdateState.phase !== 'downloaded') {
+      return;
+    }
+
+    setImmediate(() => {
+      autoUpdater.quitAndInstall();
+    });
   });
 
   ipcMain.handle('lookout:list-local-fonts', async () => listLocalFonts());
@@ -211,6 +263,125 @@ function registerIpcHandlers(): void {
   );
 }
 
+function configureAutoUpdater(): void {
+  if (updaterConfigured) {
+    return;
+  }
+
+  updaterConfigured = true;
+
+  if (!app.isPackaged) {
+    updateAppUpdateState({
+      phase: 'unsupported',
+      currentVersion: app.getVersion(),
+      error: 'App updates are only available in packaged builds.',
+    });
+    return;
+  }
+
+  updateAppUpdateState({
+    phase: 'idle',
+    currentVersion: app.getVersion(),
+  });
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    updateAppUpdateState({
+      phase: 'checking',
+      currentVersion: app.getVersion(),
+      checkedAt: new Date().toISOString(),
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    updateAppUpdateState({
+      phase: 'available',
+      currentVersion: app.getVersion(),
+      availableVersion: info.version,
+      releaseName: info.releaseName ?? undefined,
+      releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+      checkedAt: new Date().toISOString(),
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    updateAppUpdateState({
+      phase: 'not-available',
+      currentVersion: app.getVersion(),
+      checkedAt: new Date().toISOString(),
+      availableVersion: undefined,
+      releaseName: undefined,
+      releaseNotes: undefined,
+      percent: undefined,
+      bytesPerSecond: undefined,
+      transferred: undefined,
+      total: undefined,
+      downloadedFile: undefined,
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    updateAppUpdateState({
+      ...appUpdateState,
+      phase: 'downloading',
+      currentVersion: app.getVersion(),
+      percent: progress.percent,
+      bytesPerSecond: progress.bytesPerSecond,
+      transferred: progress.transferred,
+      total: progress.total,
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    updateAppUpdateState({
+      phase: 'downloaded',
+      currentVersion: app.getVersion(),
+      availableVersion: info.version,
+      releaseName: info.releaseName ?? undefined,
+      releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+      checkedAt: new Date().toISOString(),
+      downloadedFile: info.downloadedFile,
+      percent: 100,
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    updateAppUpdateState({
+      ...appUpdateState,
+      phase: 'error',
+      currentVersion: app.getVersion(),
+      error: error?.message ?? String(error),
+    });
+  });
+
+  setTimeout(() => {
+    void autoUpdater.checkForUpdates().catch((error: unknown) => {
+      updateAppUpdateState({
+        ...appUpdateState,
+        phase: 'error',
+        currentVersion: app.getVersion(),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, 3000);
+}
+
+function updateAppUpdateState(nextState: AppUpdateState): void {
+  appUpdateState = nextState;
+  emitAppUpdateState();
+}
+
+function emitAppUpdateState(): void {
+  mainWindow?.webContents.send('lookout:app-update-state', appUpdateState);
+}
+
 function captureWindowState(window: BrowserWindow | null): WindowStateSnapshot {
   if (!window) {
     return persistedStateCache?.settings.windowState ?? {
@@ -300,4 +471,20 @@ function parseFontFamilyFromRegistryLine(line: string): string | null {
     .replace(/\s+\((TrueType|OpenType)\)$/i, '')
     .replace(/\s*&\s+/g, ' & ')
     .trim();
+}
+
+function normalizeReleaseNotes(releaseNotes: string | Array<{ note?: string | null }> | null | undefined): string | undefined {
+  if (!releaseNotes) {
+    return undefined;
+  }
+
+  if (typeof releaseNotes === 'string') {
+    return releaseNotes;
+  }
+
+  const notes = releaseNotes
+    .map((entry) => entry.note?.trim())
+    .filter((entry): entry is string => Boolean(entry));
+
+  return notes.length ? notes.join('\n\n') : undefined;
 }

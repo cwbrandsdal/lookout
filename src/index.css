@@ -443,6 +443,80 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.settings-update,
+.settings-update__progress,
+.settings-update__notes {
+  border: 1px solid rgba(82, 106, 140, 0.18);
+}
+
+.settings-update {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.settings-update__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-update__copy strong {
+  font-size: 0.98rem;
+}
+
+.settings-update__copy p,
+.settings-update__progress p {
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.settings-update__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.settings-update__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.settings-update__progress-bar {
+  background: rgba(255, 255, 255, 0.05);
+  height: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.settings-update__progress-bar span {
+  background: linear-gradient(90deg, #5f9eff, #72d7ac);
+  display: block;
+  height: 100%;
+}
+
+.settings-update__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.settings-update__notes pre {
+  color: var(--text-soft);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.78rem;
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
 .settings-preview {
   align-items: center;
   border: 1px solid rgba(82, 106, 140, 0.18);
@@ -1167,6 +1241,15 @@ select.field__input option {
 
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-update {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settings-update__actions {
+    flex-wrap: wrap;
   }
 }
 
