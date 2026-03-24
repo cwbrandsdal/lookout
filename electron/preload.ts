@@ -9,6 +9,7 @@ const api: LookoutApi = {
   checkForAppUpdates: () => ipcRenderer.invoke('lookout:check-for-app-updates'),
   downloadAppUpdate: () => ipcRenderer.invoke('lookout:download-app-update'),
   installAppUpdate: () => ipcRenderer.invoke('lookout:install-app-update'),
+  getGitInfo: (inputPath) => ipcRenderer.invoke('lookout:get-git-info', inputPath),
   listLocalFonts: () => ipcRenderer.invoke('lookout:list-local-fonts'),
   pickDirectory: (initialPath) => ipcRenderer.invoke('lookout:pick-directory', initialPath),
   validateDirectory: (inputPath) => ipcRenderer.invoke('lookout:validate-directory', inputPath),

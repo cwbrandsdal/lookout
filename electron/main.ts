@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { loadPersistedState, savePersistedState } from './persistence';
 import { PtySessionManager } from './pty-session-manager';
 import { sanitizePersistedState, type PersistedAppState, type TerminalLaunchRequest, type WindowStateSnapshot } from '../src/types/app';
-import type { AppUpdateState } from '../src/types/electron-api';
+import type { AppUpdateState, GitInfoResponse } from '../src/types/electron-api';
 
 let mainWindow: BrowserWindow | null = null;
 let ptyManager: PtySessionManager | null = null;
@@ -171,6 +171,8 @@ function registerIpcHandlers(): void {
       autoUpdater.quitAndInstall();
     });
   });
+
+  ipcMain.handle('lookout:get-git-info', async (_event, inputPath: string): Promise<GitInfoResponse> => getGitInfo(inputPath));
 
   ipcMain.handle('lookout:list-local-fonts', async () => listLocalFonts());
 
@@ -487,4 +489,64 @@ function normalizeReleaseNotes(releaseNotes: string | Array<{ note?: string | nu
     .filter((entry): entry is string => Boolean(entry));
 
   return notes.length ? notes.join('\n\n') : undefined;
+}
+
+async function getGitInfo(inputPath: string): Promise<GitInfoResponse> {
+  const trimmedPath = inputPath.trim();
+  if (!trimmedPath) {
+    return { ok: false, error: 'Path is required.' };
+  }
+
+  const normalizedPath = path.resolve(trimmedPath);
+
+  try {
+    const [{ stdout: rootStdout }, { stdout: statusStdout }] = await Promise.all([
+      execFileAsync('git', ['-C', normalizedPath, 'rev-parse', '--show-toplevel'], {
+        windowsHide: true,
+      }),
+      execFileAsync('git', ['-C', normalizedPath, 'status', '--branch', '--porcelain=v1'], {
+        windowsHide: true,
+      }),
+    ]);
+
+    const repoRoot = rootStdout.trim();
+    const statusLines = statusStdout.split(/\r?\n/).filter(Boolean);
+    const headerLine = statusLines[0] ?? '';
+    const isDirty = statusLines.slice(1).length > 0;
+    const parsedBranch = parseGitBranch(headerLine);
+
+    return {
+      ok: true,
+      repoRoot,
+      branch: parsedBranch.branch,
+      isDirty,
+      isDetached: parsedBranch.isDetached,
+    };
+  } catch {
+    return {
+      ok: false,
+      error: 'Not a Git repository.',
+    };
+  }
+}
+
+function parseGitBranch(headerLine: string): { branch: string; isDetached: boolean } {
+  const normalized = headerLine.replace(/^##\s*/, '').trim();
+  if (!normalized) {
+    return { branch: 'unknown', isDetached: false };
+  }
+
+  if (normalized.startsWith('HEAD')) {
+    const detachedMatch = normalized.match(/\(([^)]+)\)/);
+    return {
+      branch: detachedMatch?.[1]?.trim() || 'detached',
+      isDetached: true,
+    };
+  }
+
+  const branch = normalized.split('...')[0]?.split(' ')[0]?.trim() || 'unknown';
+  return {
+    branch,
+    isDetached: false,
+  };
 }

@@ -17,7 +17,6 @@ import {
   removePaneFromLayoutTree,
   splitLayoutTreeAtPane,
   swapPaneIdsInLayoutTree,
-  trimTerminalBuffer,
   wrapPaneAtLayoutEdge,
   type AppSettings,
   type LayoutNode,
@@ -34,6 +33,7 @@ import {
   type TerminalLaunchResponse,
   type TerminalSessionRuntime,
 } from '../types/app';
+import { clearTerminalStream, pushTerminalData } from '../services/terminal-stream';
 
 interface DraftPanePatch extends Partial<PaneDefinition> {
   roleId?: string;
@@ -638,6 +638,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       };
 
       if (event.type === 'data') {
+        pushTerminalData(event.paneId, event.data);
+
+        if (runtime.sessionId === event.sessionId && runtime.status === 'running') {
+          return state;
+        }
+
         return {
           sessionStateByPaneId: {
             ...state.sessionStateByPaneId,
@@ -645,7 +651,6 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
               ...runtime,
               sessionId: event.sessionId,
               status: runtime.status === 'error' ? 'error' : 'running',
-              buffer: trimTerminalBuffer(runtime.buffer + event.data),
             },
           },
         };
@@ -717,15 +722,18 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }));
   },
   clearPaneBuffer: (paneId) =>
-    set((state) => ({
-      sessionStateByPaneId: {
-        ...state.sessionStateByPaneId,
-        [paneId]: {
-          ...(state.sessionStateByPaneId[paneId] ?? { status: 'idle' }),
-          buffer: '',
+    set((state) => {
+      clearTerminalStream(paneId);
+      return {
+        sessionStateByPaneId: {
+          ...state.sessionStateByPaneId,
+          [paneId]: {
+            ...(state.sessionStateByPaneId[paneId] ?? { status: 'idle' }),
+            buffer: '',
+          },
         },
-      },
-    })),
+      };
+    }),
   restoreOpenSpaces: async () => {
     return;
   },
@@ -740,6 +748,10 @@ async function startPaneSession(
   cols?: number,
   rows?: number,
 ): Promise<TerminalLaunchResponse> {
+  if (clearBuffer) {
+    clearTerminalStream(pane.id);
+  }
+
   useAppStore.setState((state) => ({
     sessionStateByPaneId: {
       ...state.sessionStateByPaneId,
@@ -768,6 +780,7 @@ async function startPaneSession(
   });
 
   if (!response.ok) {
+    pushTerminalData(pane.id, `\r\n[lookout] ${response.error}\r\n`);
     useAppStore.setState((state) => ({
       sessionStateByPaneId: {
         ...state.sessionStateByPaneId,
@@ -775,7 +788,6 @@ async function startPaneSession(
           ...state.sessionStateByPaneId[pane.id],
           status: 'error',
           error: response.error,
-          buffer: `${clearBuffer ? '' : state.sessionStateByPaneId[pane.id]?.buffer ?? ''}\r\n[lookout] ${response.error}\r\n`,
           sessionId: undefined,
           lastEndedAt: new Date().toISOString(),
         },

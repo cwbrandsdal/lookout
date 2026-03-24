@@ -5,6 +5,21 @@ export interface LoadStateResponse {
   warnings: string[];
 }
 
+export interface GitInfoSuccess {
+  ok: true;
+  repoRoot: string;
+  branch: string;
+  isDirty: boolean;
+  isDetached: boolean;
+}
+
+export interface GitInfoFailure {
+  ok: false;
+  error?: string;
+}
+
+export type GitInfoResponse = GitInfoSuccess | GitInfoFailure;
+
 export type AppUpdatePhase =
   | 'idle'
   | 'unsupported'
@@ -37,6 +52,7 @@ export interface LookoutApi {
   checkForAppUpdates: () => Promise<AppUpdateState>;
   downloadAppUpdate: () => Promise<AppUpdateState>;
   installAppUpdate: () => Promise<void>;
+  getGitInfo: (inputPath: string) => Promise<GitInfoResponse>;
   listLocalFonts: () => Promise<string[]>;
   pickDirectory: (initialPath?: string) => Promise<string | null>;
   validateDirectory: (inputPath: string) => Promise<ValidationResponse>;

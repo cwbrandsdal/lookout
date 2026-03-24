@@ -1,5 +1,5 @@
-import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, FolderKanban, RefreshCw, X } from 'lucide-react';
+import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Download, FolderKanban, RefreshCw, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { TabStrip } from './components/TabStrip';
@@ -7,6 +7,12 @@ import { SettingsView } from './components/SettingsView';
 import { WorkspaceConfigurator } from './components/WorkspaceConfigurator';
 import { WorkspaceView } from './components/WorkspaceView';
 import { useAppStore } from './store/useAppStore';
+import type { AppUpdateState } from './types/electron-api';
+
+const DEFAULT_UPDATE_STATE: AppUpdateState = {
+  phase: 'unsupported',
+  currentVersion: '0.0.0',
+};
 
 function App() {
   return (
@@ -19,6 +25,8 @@ function App() {
 function AppContent() {
   const restoredSessionsRef = useRef(false);
   const [bootError, setBootError] = useState<string | null>(null);
+  const [appUpdateState, setAppUpdateState] = useState<AppUpdateState>(DEFAULT_UPDATE_STATE);
+  const [dismissedUpdateKey, setDismissedUpdateKey] = useState<string | null>(null);
   const initialize = useAppStore((state) => state.initialize);
   const handleTerminalEvent = useAppStore((state) => state.handleTerminalEvent);
   const restoreOpenSpaces = useAppStore((state) => state.restoreOpenSpaces);
@@ -48,6 +56,14 @@ function AppContent() {
     : 'Electron preload bridge is unavailable. The renderer cannot talk to the desktop backend.';
   const openSpaces = projectSpaces.filter((space) => space.isOpen);
   const activeSpace = openSpaces.find((space) => space.id === activeSpaceId) ?? openSpaces[0] ?? null;
+  const updateNoticeKey = useMemo(() => {
+    if (appUpdateState.phase === 'available' || appUpdateState.phase === 'downloaded') {
+      return `${appUpdateState.phase}:${appUpdateState.availableVersion ?? 'unknown'}`;
+    }
+
+    return null;
+  }, [appUpdateState.availableVersion, appUpdateState.phase]);
+  const showUpdateBanner = updateNoticeKey !== null && updateNoticeKey !== dismissedUpdateKey;
 
   useEffect(() => {
     if (!bridgeAvailable) {
@@ -102,6 +118,31 @@ function AppContent() {
     return () => window.clearTimeout(timeout);
   }, [bridgeAvailable, hydrated, presets, projectSpaces, roles, settings]);
 
+  useEffect(() => {
+    if (!bridgeAvailable) {
+      return;
+    }
+
+    let isMounted = true;
+
+    void window.lookout.getAppUpdateState().then((state) => {
+      if (isMounted) {
+        setAppUpdateState(state);
+      }
+    });
+
+    const unsubscribe = window.lookout.onAppUpdateState((state) => {
+      if (isMounted) {
+        setAppUpdateState(state);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [bridgeAvailable]);
+
   if (bridgeError) {
     return <DiagnosticScreen title="Desktop bridge missing" message={bridgeError} />;
   }
@@ -142,6 +183,53 @@ function AppContent() {
                 </button>
               </div>
             ))}
+          </div>
+        ) : null}
+
+        {showUpdateBanner ? (
+          <div className="update-banner">
+            <div className="update-banner__copy">
+              <Download size={16} />
+              <div>
+                <strong>
+                  {appUpdateState.phase === 'downloaded'
+                    ? `Update ${appUpdateState.availableVersion ?? ''} is ready`
+                    : `Update ${appUpdateState.availableVersion ?? ''} is available`}
+                </strong>
+                <span>
+                  {appUpdateState.phase === 'downloaded'
+                    ? 'Restart Lookout to install the downloaded update.'
+                    : 'A newer version was found automatically when the app opened.'}
+                </span>
+              </div>
+            </div>
+            <div className="update-banner__actions">
+              {appUpdateState.phase === 'available' ? (
+                <button
+                  className="button button--primary button--compact"
+                  onClick={() => void window.lookout.downloadAppUpdate()}
+                  type="button"
+                >
+                  Download update
+                </button>
+              ) : null}
+              {appUpdateState.phase === 'downloaded' ? (
+                <button
+                  className="button button--primary button--compact"
+                  onClick={() => void window.lookout.installAppUpdate()}
+                  type="button"
+                >
+                  Restart to install
+                </button>
+              ) : null}
+              <button
+                className="button button--ghost button--compact"
+                onClick={() => setDismissedUpdateKey(updateNoticeKey)}
+                type="button"
+              >
+                Later
+              </button>
+            </div>
           </div>
         ) : null}
 

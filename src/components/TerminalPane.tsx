@@ -1,13 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Columns2, Copy, FolderOpen, Play, RefreshCcw, Rows2, Square, Trash2, X } from 'lucide-react';
+import { Columns2, Copy, FolderOpen, GitBranch, Play, RefreshCcw, Rows2, Square, Trash2, X } from 'lucide-react';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useAppStore } from '../store/useAppStore';
+import { getTerminalBuffer, subscribeToTerminalStream } from '../services/terminal-stream';
 import { getRoleDefinition, type PaneDefinition, type ProjectSpace } from '../types/app';
+import type { GitInfoResponse } from '../types/electron-api';
 
 interface TerminalPaneProps {
   space: ProjectSpace;
@@ -28,6 +30,10 @@ const DEFAULT_RUNTIME = {
   status: 'idle',
   buffer: '',
 } as const;
+
+const NO_GIT_INFO: GitInfoResponse = {
+  ok: false,
+};
 
 const TERMINAL_THEME = {
   background: '#0b1118',
@@ -84,13 +90,24 @@ export function TerminalPane({
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | undefined>(runtime.sessionId);
-  const writtenLengthRef = useRef(0);
+  const recentPasteWriteRef = useRef<{ text: string; at: number } | null>(null);
+  const [gitInfo, setGitInfo] = useState<GitInfoResponse>(NO_GIT_INFO);
 
   async function writeClipboardText(text: string) {
     const sessionId = sessionIdRef.current;
     if (!sessionId || !text) {
       return;
     }
+
+    const recentPaste = recentPasteWriteRef.current;
+    if (recentPaste && recentPaste.text === text && Date.now() - recentPaste.at < 250) {
+      return;
+    }
+
+    recentPasteWriteRef.current = {
+      text,
+      at: Date.now(),
+    };
 
     await window.lookout.writeTerminalData(sessionId, text);
     terminalRef.current?.focus();
@@ -130,7 +147,9 @@ export function TerminalPane({
     const terminal = new Terminal({
       allowTransparency: true,
       convertEol: true,
-      cursorBlink: true,
+      cursorBlink: false,
+      cursorInactiveStyle: 'none',
+      cursorStyle: 'bar',
       fontFamily: '"Cascadia Code", "JetBrains Mono", Consolas, monospace',
       fontSize: 13,
       letterSpacing: 0,
@@ -141,20 +160,59 @@ export function TerminalPane({
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(containerRef.current);
-    terminal.focus();
     fitAddon.fit();
     terminal.attachCustomKeyEventHandler((event) => {
+      const isCopyShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c';
       const isPasteShortcut =
         ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') ||
         (event.shiftKey && event.key === 'Insert');
+      const isShiftInsertPaste = event.shiftKey && event.key === 'Insert';
 
-      if (isPasteShortcut) {
-        void navigator.clipboard.readText().then(writeClipboardText).catch(() => {});
+      if (isCopyShortcut && terminal.hasSelection()) {
+        event.preventDefault();
+        event.stopPropagation();
+        void navigator.clipboard.writeText(terminal.getSelection()).catch(() => {});
+        return false;
+      }
+
+      if (isPasteShortcut && event.type === 'keydown') {
+        event.preventDefault();
+        event.stopPropagation();
+        void navigator.clipboard
+          .readText()
+          .then((text) => {
+            if (!text) {
+              return;
+            }
+
+            return writeClipboardText(text);
+          })
+          .catch(() => {});
+        return false;
+      }
+
+      if (isShiftInsertPaste) {
+        event.preventDefault();
+        event.stopPropagation();
         return false;
       }
 
       return true;
     });
+
+    const helperTextarea = containerRef.current.querySelector('textarea');
+    const handleNativePaste = (event: ClipboardEvent) => {
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (!text) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void writeClipboardText(text);
+    };
+
+    helperTextarea?.addEventListener('paste', handleNativePaste, true);
 
     const dataDisposable = terminal.onData((data) => {
       const sessionId = sessionIdRef.current;
@@ -181,12 +239,12 @@ export function TerminalPane({
     fitAddonRef.current = fitAddon;
 
     return () => {
+      helperTextarea?.removeEventListener('paste', handleNativePaste, true);
       resizeObserver.disconnect();
       dataDisposable.dispose();
       terminal.dispose();
       terminalRef.current = null;
       fitAddonRef.current = null;
-      writtenLengthRef.current = 0;
     };
   }, []);
 
@@ -196,20 +254,21 @@ export function TerminalPane({
       return;
     }
 
-    const currentBuffer = runtime.buffer ?? '';
-    if (currentBuffer.length < writtenLengthRef.current) {
+    const initialBuffer = getTerminalBuffer(pane.id);
+    if (initialBuffer) {
       terminal.reset();
-      terminal.write(currentBuffer);
-      writtenLengthRef.current = currentBuffer.length;
-      return;
+      terminal.write(initialBuffer);
     }
 
-    const nextChunk = currentBuffer.slice(writtenLengthRef.current);
-    if (nextChunk) {
-      terminal.write(nextChunk);
-      writtenLengthRef.current = currentBuffer.length;
-    }
-  }, [runtime.buffer]);
+    return subscribeToTerminalStream(pane.id, (event) => {
+      if (event.type === 'clear') {
+        terminal.reset();
+        return;
+      }
+
+      terminal.write(event.data);
+    });
+  }, [pane.id]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -236,7 +295,6 @@ export function TerminalPane({
       return;
     }
 
-    terminal.focus();
     fitAddon.fit();
     void window.lookout.resizeTerminalSession(runtime.sessionId, terminal.cols, terminal.rows);
   }, [runtime.sessionId]);
@@ -249,12 +307,12 @@ export function TerminalPane({
 
     if (!runtime.sessionId && runtime.status === 'idle') {
       void launchPane(space.id, pane.id, {
-        clearBuffer: runtime.buffer.length === 0,
+        clearBuffer: true,
         cols: terminal.cols,
         rows: terminal.rows,
       });
     }
-  }, [launchPane, pane.autoStart, pane.id, runtime.buffer.length, runtime.sessionId, runtime.status, space.id]);
+  }, [launchPane, pane.autoStart, pane.id, runtime.sessionId, runtime.status, space.id]);
 
   const effectivePath = runtime.cwd ?? pane.workingDirectory ?? space.rootPath;
   const overlayMessage =
@@ -262,14 +320,48 @@ export function TerminalPane({
       ? 'Launching PowerShell session...'
       : runtime.error ?? 'Pane is idle. Launch the session to start a PowerShell-backed terminal.';
 
-  function handlePaste(event: ReactClipboardEvent<HTMLDivElement>) {
-    const text = event.clipboardData.getData('text');
-    if (!text) {
+  useEffect(() => {
+    let isMounted = true;
+
+    async function refreshGitInfo() {
+      if (!effectivePath.trim()) {
+        if (isMounted) {
+          setGitInfo(NO_GIT_INFO);
+        }
+        return;
+      }
+
+      try {
+        const nextGitInfo = await window.lookout.getGitInfo(effectivePath);
+        if (isMounted) {
+          setGitInfo(nextGitInfo);
+        }
+      } catch {
+        if (isMounted) {
+          setGitInfo(NO_GIT_INFO);
+        }
+      }
+    }
+
+    void refreshGitInfo();
+    const intervalId = window.setInterval(() => {
+      void refreshGitInfo();
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [effectivePath, runtime.status]);
+
+  function handleCopy(event: ReactClipboardEvent<HTMLDivElement>) {
+    const selectedText = terminalRef.current?.getSelection() ?? '';
+    if (!selectedText) {
       return;
     }
 
     event.preventDefault();
-    void writeClipboardText(text);
+    event.clipboardData.setData('text/plain', selectedText);
   }
 
   return (
@@ -296,6 +388,13 @@ export function TerminalPane({
         <div className="terminal-pane__meta">
           {DragHandleIcon ? <DragHandleIcon className="terminal-pane__drag-handle" size={12} /> : null}
           <strong className="terminal-pane__title">{pane.title || role.displayName}</strong>
+          {gitInfo.ok ? (
+            <span className={`terminal-pane__git ${gitInfo.isDirty ? 'is-dirty' : ''}`} title={gitInfo.repoRoot}>
+              <GitBranch size={11} />
+              <span>{gitInfo.branch}</span>
+              {gitInfo.isDirty ? <em>*</em> : null}
+            </span>
+          ) : null}
           <span className="terminal-pane__path">{effectivePath}</span>
         </div>
 
@@ -356,10 +455,10 @@ export function TerminalPane({
 
       <div className="terminal-pane__body">
         <div
+          onCopy={handleCopy}
           className="terminal-pane__viewport"
           onClick={() => terminalRef.current?.focus()}
           onMouseDown={() => terminalRef.current?.focus()}
-          onPaste={handlePaste}
           ref={containerRef}
           tabIndex={0}
         />
