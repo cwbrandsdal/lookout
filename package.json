@@ -1,7 +1,7 @@
 {
   "name": "lookout",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "productName": "Lookout",
   "author": "Christopher Brandsdal",
   "description": "Lookout desktop workspace organizer for multi-terminal project spaces.",
@@ -87,7 +87,8 @@
       {
         "provider": "github",
         "owner": "cwbrandsdal",
-        "repo": "lookout"
+        "repo": "lookout",
+        "releaseType": "release"
       }
     ],
     "nsis": {
