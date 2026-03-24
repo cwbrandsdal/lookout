@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowSyntheticDefaultImports": true,
+    "types": ["node", "electron"],
+    "noEmit": true
+  },
+  "include": ["electron/**/*.ts", "scripts/**/*.mjs", "src/types/**/*.d.ts"]
+}
