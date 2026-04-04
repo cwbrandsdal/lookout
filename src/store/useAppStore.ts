@@ -45,6 +45,7 @@ interface AppStoreState {
   view: 'configurator' | 'workspace' | 'settings';
   draftMode: 'create' | 'edit';
   activeSpaceId: string | null;
+  maximizedPaneIdBySpaceId: Record<string, string | null>;
   settings: AppSettings;
   roles: RoleDefinition[];
   presets: Preset[];
@@ -69,6 +70,8 @@ interface AppStoreState {
   splitPane: (spaceId: string, paneId: string, direction: LayoutSplitDirection) => Promise<void>;
   removePane: (spaceId: string, paneId: string) => Promise<void>;
   movePaneToEdge: (spaceId: string, paneId: string, edge: LayoutEdge) => void;
+  togglePaneMaximized: (spaceId: string, paneId: string) => void;
+  clearPaneMaximized: (spaceId: string) => void;
   reopenSpace: (spaceId: string) => Promise<void>;
   closeSpace: (spaceId: string) => Promise<void>;
   renameSpace: (spaceId: string, displayName: string) => void;
@@ -94,6 +97,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   view: 'configurator',
   draftMode: 'create',
   activeSpaceId: null,
+  maximizedPaneIdBySpaceId: {},
   settings: defaultState.settings,
   roles: defaultState.roles,
   presets: defaultState.presets,
@@ -111,6 +115,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       view: openSpaces.length ? 'workspace' : 'configurator',
       draftMode: 'create',
       activeSpaceId: lastActive,
+      maximizedPaneIdBySpaceId: {},
       settings: {
         ...state.settings,
       },
@@ -340,6 +345,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       });
 
       return {
+        maximizedPaneIdBySpaceId: syncMaximizedPaneState(current.maximizedPaneIdBySpaceId, nextSpace),
         projectSpaces,
         activeSpaceId: nextSpace.id,
         view: 'workspace',
@@ -379,6 +385,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       };
 
       set((current) => ({
+        maximizedPaneIdBySpaceId: syncMaximizedPaneState(current.maximizedPaneIdBySpaceId, updatedSpace),
         projectSpaces: current.projectSpaces.map((entry) => (entry.id === spaceId ? updatedSpace : entry)),
       }));
 
@@ -404,6 +411,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     };
 
     set((current) => ({
+      maximizedPaneIdBySpaceId: syncMaximizedPaneState(current.maximizedPaneIdBySpaceId, updatedSpace),
       projectSpaces: current.projectSpaces.map((entry) => (entry.id === spaceId ? updatedSpace : entry)),
     }));
 
@@ -422,15 +430,16 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       }
 
       if (space.layoutTree) {
+        const updatedSpace: ProjectSpace = {
+          ...space,
+          layoutTree: swapPaneIdsInLayoutTree(space.layoutTree!, sourcePaneId, targetPaneId),
+          updatedAt: new Date().toISOString(),
+        };
+
         return {
+          maximizedPaneIdBySpaceId: syncMaximizedPaneState(state.maximizedPaneIdBySpaceId, updatedSpace),
           projectSpaces: state.projectSpaces.map((entry) =>
-            entry.id === spaceId
-              ? {
-                  ...entry,
-                  layoutTree: swapPaneIdsInLayoutTree(space.layoutTree!, sourcePaneId, targetPaneId),
-                  updatedAt: new Date().toISOString(),
-                }
-              : entry,
+            entry.id === spaceId ? updatedSpace : entry,
           ),
         };
       }
@@ -438,16 +447,16 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const reorderedPanes = [...space.paneDefinitions];
       const [movedPane] = reorderedPanes.splice(sourceIndex, 1);
       reorderedPanes.splice(targetIndex, 0, movedPane);
+      const updatedSpace: ProjectSpace = {
+        ...space,
+        paneDefinitions: reorderedPanes,
+        updatedAt: new Date().toISOString(),
+      };
 
       return {
+        maximizedPaneIdBySpaceId: syncMaximizedPaneState(state.maximizedPaneIdBySpaceId, updatedSpace),
         projectSpaces: state.projectSpaces.map((entry) =>
-          entry.id === spaceId
-            ? {
-                ...entry,
-                paneDefinitions: reorderedPanes,
-                updatedAt: new Date().toISOString(),
-              }
-            : entry,
+          entry.id === spaceId ? updatedSpace : entry,
         ),
       };
     }),
@@ -474,6 +483,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     };
 
     set((current) => ({
+      maximizedPaneIdBySpaceId: syncMaximizedPaneState(current.maximizedPaneIdBySpaceId, updatedSpace),
       projectSpaces: current.projectSpaces.map((entry) => (entry.id === spaceId ? updatedSpace : entry)),
     }));
   },
@@ -498,18 +508,18 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set((current) => {
       const sessionStateByPaneId = { ...current.sessionStateByPaneId };
       delete sessionStateByPaneId[paneId];
+      const updatedSpace: ProjectSpace = {
+        ...space,
+        layoutTemplateId: nextTemplateId,
+        paneDefinitions: nextPaneDefinitions,
+        layoutTree: nextLayoutTree,
+        updatedAt: new Date().toISOString(),
+      };
 
       return {
+        maximizedPaneIdBySpaceId: syncMaximizedPaneState(current.maximizedPaneIdBySpaceId, updatedSpace),
         projectSpaces: current.projectSpaces.map((entry) =>
-          entry.id === spaceId
-            ? {
-                ...entry,
-                layoutTemplateId: nextTemplateId,
-                paneDefinitions: nextPaneDefinitions,
-                layoutTree: nextLayoutTree,
-                updatedAt: new Date().toISOString(),
-              }
-            : entry,
+          entry.id === spaceId ? updatedSpace : entry,
         ),
         sessionStateByPaneId,
       };
@@ -533,16 +543,45 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         return state;
       }
 
+      const updatedSpace: ProjectSpace = {
+        ...space,
+        layoutTree: nextLayoutTree,
+        updatedAt: new Date().toISOString(),
+      };
+
       return {
+        maximizedPaneIdBySpaceId: syncMaximizedPaneState(state.maximizedPaneIdBySpaceId, updatedSpace),
         projectSpaces: state.projectSpaces.map((entry) =>
-          entry.id === spaceId
-            ? {
-                ...entry,
-                layoutTree: nextLayoutTree,
-                updatedAt: new Date().toISOString(),
-              }
-            : entry,
+          entry.id === spaceId ? updatedSpace : entry,
         ),
+      };
+    }),
+  togglePaneMaximized: (spaceId, paneId) =>
+    set((state) => {
+      const space = state.projectSpaces.find((entry) => entry.id === spaceId);
+      if (!space || !space.paneDefinitions.some((pane) => pane.id === paneId)) {
+        return state;
+      }
+
+      const currentPaneId = state.maximizedPaneIdBySpaceId[spaceId] ?? null;
+      return {
+        maximizedPaneIdBySpaceId: {
+          ...state.maximizedPaneIdBySpaceId,
+          [spaceId]: currentPaneId === paneId ? null : paneId,
+        },
+      };
+    }),
+  clearPaneMaximized: (spaceId) =>
+    set((state) => {
+      if (!(spaceId in state.maximizedPaneIdBySpaceId) || state.maximizedPaneIdBySpaceId[spaceId] === null) {
+        return state;
+      }
+
+      return {
+        maximizedPaneIdBySpaceId: {
+          ...state.maximizedPaneIdBySpaceId,
+          [spaceId]: null,
+        },
       };
     }),
   reopenSpace: async (spaceId) => {
@@ -590,6 +629,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const nextActiveSpaceId = state.activeSpaceId === spaceId ? openSpaces[0]?.id ?? null : state.activeSpaceId;
 
     set((current) => ({
+      maximizedPaneIdBySpaceId: {
+        ...current.maximizedPaneIdBySpaceId,
+        [spaceId]: null,
+      },
       projectSpaces: current.projectSpaces.map((space) =>
         space.id === spaceId
           ? {
@@ -823,4 +866,23 @@ function getSuggestedSplitDirection(layoutTree: LayoutNode): LayoutSplitDirectio
   }
 
   return layoutTree.direction === 'horizontal' ? 'vertical' : 'horizontal';
+}
+
+function syncMaximizedPaneState(
+  maximizedPaneIdBySpaceId: Record<string, string | null>,
+  space: Pick<ProjectSpace, 'id' | 'paneDefinitions'>,
+): Record<string, string | null> {
+  const maximizedPaneId = maximizedPaneIdBySpaceId[space.id];
+  if (!maximizedPaneId) {
+    return maximizedPaneIdBySpaceId;
+  }
+
+  if (space.paneDefinitions.some((pane) => pane.id === maximizedPaneId)) {
+    return maximizedPaneIdBySpaceId;
+  }
+
+  return {
+    ...maximizedPaneIdBySpaceId,
+    [space.id]: null,
+  };
 }

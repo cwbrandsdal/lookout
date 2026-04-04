@@ -38,7 +38,7 @@ export function TabStrip({
         <Settings2 size={14} />
       </button>
 
-      <div className="tab-strip__track">
+      <div className="tab-strip__track no-drag">
         {spaces.map((space) => {
           const isActive = activeSpaceId === space.id;
           return (

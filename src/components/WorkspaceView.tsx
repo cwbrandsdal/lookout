@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { GripVertical, Plus, Settings2 } from 'lucide-react';
+import { GripVertical, Minimize2, Plus, Settings2 } from 'lucide-react';
 
 import { buildLayoutTreeFromTemplate, getLayoutTemplate, type LayoutEdge, type LayoutNode, type ProjectSpace } from '../types/app';
 import { useAppStore } from '../store/useAppStore';
@@ -15,12 +15,19 @@ export function WorkspaceView({ space }: WorkspaceViewProps) {
   const splitPane = useAppStore((state) => state.splitPane);
   const removePane = useAppStore((state) => state.removePane);
   const movePaneToEdge = useAppStore((state) => state.movePaneToEdge);
+  const togglePaneMaximized = useAppStore((state) => state.togglePaneMaximized);
+  const clearPaneMaximized = useAppStore((state) => state.clearPaneMaximized);
+  const maximizedPaneId = useAppStore((state) => state.maximizedPaneIdBySpaceId[space.id] ?? null);
   const layout = getLayoutTemplate(space.layoutTemplateId);
   const [draggedPaneId, setDraggedPaneId] = useState<string | null>(null);
   const [dropTargetPaneId, setDropTargetPaneId] = useState<string | null>(null);
   const [dropTargetEdge, setDropTargetEdge] = useState<LayoutEdge | null>(null);
 
   const paneMap = useMemo(() => new Map(space.paneDefinitions.map((pane) => [pane.id, pane])), [space.paneDefinitions]);
+  const maximizedPane = useMemo(
+    () => (maximizedPaneId ? paneMap.get(maximizedPaneId) ?? null : null),
+    [maximizedPaneId, paneMap],
+  );
   const layoutTree = useMemo(
     () => space.layoutTree ?? buildLayoutTreeFromTemplate(space.layoutTemplateId, space.paneDefinitions.map((pane) => pane.id)),
     [space.layoutTemplateId, space.layoutTree, space.paneDefinitions],
@@ -61,9 +68,22 @@ export function WorkspaceView({ space }: WorkspaceViewProps) {
         </div>
         <div className="workspace__toolbar-actions">
           <span className="workspace__toolbar-meta">
-            {space.layoutTree ? 'Custom split layout' : layout.name} | {space.paneDefinitions.length} panes
+            {maximizedPane
+              ? `Focused pane | ${maximizedPane.title || 'Terminal'}`
+              : `${space.layoutTree ? 'Custom split layout' : layout.name} | ${space.paneDefinitions.length} panes`}
           </span>
-          <button className="button button--ghost button--compact" onClick={() => void addPaneToSpace(space.id)} type="button">
+          {maximizedPane ? (
+            <button className="button button--ghost button--compact" onClick={() => clearPaneMaximized(space.id)} type="button">
+              <Minimize2 size={14} />
+              Restore Grid
+            </button>
+          ) : null}
+          <button
+            className="button button--ghost button--compact"
+            disabled={Boolean(maximizedPane)}
+            onClick={() => void addPaneToSpace(space.id)}
+            type="button"
+          >
             <Plus size={14} />
             Add Pane
           </button>
@@ -74,8 +94,16 @@ export function WorkspaceView({ space }: WorkspaceViewProps) {
         </div>
       </div>
 
-      <div className="workspace__grid workspace__grid--split workspace__grid--edge-drop">
-        {layoutTree ? (
+      <div className={`workspace__grid workspace__grid--split workspace__grid--edge-drop ${maximizedPane ? 'workspace__grid--maximized' : ''}`}>
+        {maximizedPane ? (
+          <TerminalPane
+            isMaximized
+            key={maximizedPane.id}
+            onToggleMaximize={() => togglePaneMaximized(space.id, maximizedPane.id)}
+            pane={maximizedPane}
+            space={space}
+          />
+        ) : layoutTree ? (
           <SplitLayoutNodeView
             draggedPaneId={draggedPaneId}
             dropTargetPaneId={dropTargetPaneId}
@@ -90,12 +118,13 @@ export function WorkspaceView({ space }: WorkspaceViewProps) {
             onDrop={handleDrop}
             onRemovePane={(paneId) => void removePane(space.id, paneId)}
             onSplitPane={(paneId, direction) => void splitPane(space.id, paneId, direction)}
+            onToggleMaximize={(paneId) => togglePaneMaximized(space.id, paneId)}
             paneMap={paneMap}
             space={space}
           />
         ) : null}
 
-        {draggedPaneId ? (
+        {draggedPaneId && !maximizedPane ? (
           <>
             <EdgeDropZone edge="left" isActive={dropTargetEdge === 'left'} onDrop={handleEdgeDrop} onHover={setDropTargetEdge} />
             <EdgeDropZone edge="right" isActive={dropTargetEdge === 'right'} onDrop={handleEdgeDrop} onHover={setDropTargetEdge} />
@@ -120,6 +149,7 @@ function SplitLayoutNodeView({
   onDrop,
   onSplitPane,
   onRemovePane,
+  onToggleMaximize,
 }: {
   layoutNode: LayoutNode;
   space: ProjectSpace;
@@ -132,6 +162,7 @@ function SplitLayoutNodeView({
   onDrop: (paneId: string) => void;
   onSplitPane: (paneId: string, direction: 'horizontal' | 'vertical') => void;
   onRemovePane: (paneId: string) => void;
+  onToggleMaximize: (paneId: string) => void;
 }) {
   if (layoutNode.type === 'leaf') {
     const pane = paneMap.get(layoutNode.paneId);
@@ -152,6 +183,7 @@ function SplitLayoutNodeView({
         onRemovePane={space.paneDefinitions.length > 1 ? () => onRemovePane(pane.id) : undefined}
         onSplitHorizontal={() => onSplitPane(pane.id, 'horizontal')}
         onSplitVertical={() => onSplitPane(pane.id, 'vertical')}
+        onToggleMaximize={() => onToggleMaximize(pane.id)}
         pane={pane}
         space={space}
       />
@@ -171,6 +203,7 @@ function SplitLayoutNodeView({
           onDrop={onDrop}
           onRemovePane={onRemovePane}
           onSplitPane={onSplitPane}
+          onToggleMaximize={onToggleMaximize}
           paneMap={paneMap}
           space={space}
         />
@@ -186,6 +219,7 @@ function SplitLayoutNodeView({
           onDrop={onDrop}
           onRemovePane={onRemovePane}
           onSplitPane={onSplitPane}
+          onToggleMaximize={onToggleMaximize}
           paneMap={paneMap}
           space={space}
         />

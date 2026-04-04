@@ -1007,6 +1007,10 @@ select.field__input option {
   isolation: isolate;
 }
 
+.workspace__grid--maximized {
+  padding: 0;
+}
+
 .split-layout {
   display: flex;
   flex: 1;
@@ -1122,13 +1126,21 @@ select.field__input option {
   outline-offset: -1px;
 }
 
+.terminal-pane.is-maximized {
+  border-color: rgba(105, 147, 223, 0.36);
+  box-shadow: inset 0 0 0 1px rgba(79, 146, 255, 0.1);
+}
+
 .terminal-pane__header {
   background: linear-gradient(180deg, rgba(17, 26, 38, 0.96), rgba(11, 17, 25, 0.96));
   border-bottom: 1px solid rgba(82, 106, 140, 0.18);
-  cursor: move;
   gap: 8px;
   min-height: 32px;
   padding: 4px 8px;
+}
+
+.terminal-pane__header.is-draggable {
+  cursor: move;
 }
 
 .terminal-pane__meta {

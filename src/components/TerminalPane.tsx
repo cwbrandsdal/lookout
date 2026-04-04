@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Columns2, Copy, FolderOpen, GitBranch, Play, RefreshCcw, Rows2, Square, Trash2, X } from 'lucide-react';
+import { Columns2, Copy, FolderOpen, GitBranch, Maximize2, Minimize2, Play, RefreshCcw, Rows2, Square, Trash2, X } from 'lucide-react';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import { useShallow } from 'zustand/react/shallow';
@@ -24,6 +24,8 @@ interface TerminalPaneProps {
   onSplitHorizontal?: () => void;
   onSplitVertical?: () => void;
   onRemovePane?: () => void;
+  onToggleMaximize?: () => void;
+  isMaximized?: boolean;
 }
 
 const DEFAULT_RUNTIME = {
@@ -70,6 +72,8 @@ export function TerminalPane({
   onSplitHorizontal,
   onSplitVertical,
   onRemovePane,
+  onToggleMaximize,
+  isMaximized = false,
 }: TerminalPaneProps) {
   const { runtimeFromStore, role, launchPane, stopPane, clearPaneBuffer } = useAppStore(
     useShallow((state) => ({
@@ -92,6 +96,7 @@ export function TerminalPane({
   const sessionIdRef = useRef<string | undefined>(runtime.sessionId);
   const recentPasteWriteRef = useRef<{ text: string; at: number } | null>(null);
   const [gitInfo, setGitInfo] = useState<GitInfoResponse>(NO_GIT_INFO);
+  const isDraggable = !isMaximized && Boolean(onDragStart || onDragEnd);
 
   async function writeClipboardText(text: string) {
     const sessionId = sessionIdRef.current;
@@ -366,7 +371,7 @@ export function TerminalPane({
 
   return (
     <article
-      className={`terminal-pane ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''}`}
+      className={`terminal-pane ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isMaximized ? 'is-maximized' : ''}`}
       onDragOver={(event) => {
         event.preventDefault();
         onDragOver?.();
@@ -377,8 +382,8 @@ export function TerminalPane({
       }}
     >
       <header
-        className="terminal-pane__header"
-        draggable
+        className={`terminal-pane__header ${isDraggable ? 'is-draggable' : ''}`}
+        draggable={isDraggable}
         onDragEnd={() => onDragEnd?.()}
         onDragStart={(event) => {
           event.dataTransfer.effectAllowed = 'move';
@@ -403,16 +408,37 @@ export function TerminalPane({
             {role.displayName}
           </span>
           <span className={`status-pill status-pill--${runtime.status}`}>{runtime.status}</span>
-          <button className="icon-button" draggable={false} onClick={() => onSplitHorizontal?.()} title="Split left/right" type="button">
-            <Columns2 size={12} />
-          </button>
-          <button className="icon-button" draggable={false} onClick={() => onSplitVertical?.()} title="Split top/bottom" type="button">
-            <Rows2 size={12} />
-          </button>
-          {onRemovePane ? (
-            <button className="icon-button icon-button--danger" draggable={false} onClick={() => onRemovePane()} title="Remove pane" type="button">
-              <X size={12} />
+          {onToggleMaximize ? (
+            <button
+              className="icon-button"
+              draggable={false}
+              onClick={() => onToggleMaximize()}
+              title={isMaximized ? 'Restore pane to grid' : 'Maximize pane'}
+              type="button"
+            >
+              {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
             </button>
+          ) : null}
+          {!isMaximized ? (
+            <>
+              <button className="icon-button" draggable={false} onClick={() => onSplitHorizontal?.()} title="Split left/right" type="button">
+                <Columns2 size={12} />
+              </button>
+              <button className="icon-button" draggable={false} onClick={() => onSplitVertical?.()} title="Split top/bottom" type="button">
+                <Rows2 size={12} />
+              </button>
+              {onRemovePane ? (
+                <button
+                  className="icon-button icon-button--danger"
+                  draggable={false}
+                  onClick={() => onRemovePane()}
+                  title="Remove pane"
+                  type="button"
+                >
+                  <X size={12} />
+                </button>
+              ) : null}
+            </>
           ) : null}
           <button className="icon-button" draggable={false} onClick={() => void restartWithCurrentSize()} type="button">
             <RefreshCcw size={14} />
