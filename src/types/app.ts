@@ -58,6 +58,7 @@ export interface ProjectSpace {
   id: string;
   displayName: string;
   rootPath: string;
+  pinned: boolean;
   layoutTemplateId: LayoutTemplateId;
   paneDefinitions: PaneDefinition[];
   layoutTree?: LayoutNode | null;
@@ -99,6 +100,7 @@ export interface WindowStateSnapshot {
 export interface AppSettings {
   restoreOpenProjectSpaces: boolean;
   rememberRecentProjectPaths: boolean;
+  showPinnedTabsOnly: boolean;
   recentProjectPaths: string[];
   lastActiveSpaceId?: string | null;
   terminalFontFace: string;
@@ -411,6 +413,7 @@ export function createDefaultAppState(): PersistedAppState {
     settings: {
       restoreOpenProjectSpaces: true,
       rememberRecentProjectPaths: true,
+      showPinnedTabsOnly: true,
       recentProjectPaths: [],
       lastActiveSpaceId: null,
       terminalFontFace: 'MesloLGL Nerd Font Propo',
@@ -439,6 +442,7 @@ export function createProjectSpaceFromDraft(draft: ProjectSpaceDraft): ProjectSp
     id: draft.projectSpaceId ?? crypto.randomUUID(),
     displayName,
     rootPath: draft.rootPath.trim(),
+    pinned: false,
     layoutTemplateId: draft.layoutTemplateId,
     paneDefinitions: draft.layoutTree
       ? draft.paneDefinitions.map((pane) => normalizePaneDefinition(pane))
@@ -540,6 +544,10 @@ export function sanitizePersistedState(input: unknown): PersistedAppState {
         typeof settingsCandidate?.rememberRecentProjectPaths === 'boolean'
           ? settingsCandidate.rememberRecentProjectPaths
           : defaults.settings.rememberRecentProjectPaths,
+      showPinnedTabsOnly:
+        typeof settingsCandidate?.showPinnedTabsOnly === 'boolean'
+          ? settingsCandidate.showPinnedTabsOnly
+          : defaults.settings.showPinnedTabsOnly,
       recentProjectPaths: Array.isArray(settingsCandidate?.recentProjectPaths)
         ? settingsCandidate.recentProjectPaths.filter((entry): entry is string => typeof entry === 'string').slice(0, 12)
         : defaults.settings.recentProjectPaths,
@@ -635,6 +643,7 @@ function sanitizeProjectSpace(input: Partial<ProjectSpace>, presets: Preset[]): 
         ? input.displayName.trim()
         : deriveDisplayNameFromPath(rootPath || 'Workspace'),
     rootPath,
+    pinned: typeof input.pinned === 'boolean' ? input.pinned : false,
     layoutTemplateId: layoutId,
     paneDefinitions: layoutTree ? paneDefinitions : coercePaneDefinitions(layoutId, paneDefinitions),
     layoutTree,

@@ -75,6 +75,7 @@ interface AppStoreState {
   reopenSpace: (spaceId: string) => Promise<void>;
   closeSpace: (spaceId: string) => Promise<void>;
   renameSpace: (spaceId: string, displayName: string) => void;
+  toggleSpacePinned: (spaceId: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   clearWarning: (warning: string) => void;
   handleTerminalEvent: (event: TerminalEvent) => void;
@@ -130,9 +131,18 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   },
   setView: (view) => set({ view }),
   activateSpace: (spaceId) => {
+    const now = new Date().toISOString();
     set((state) => ({
       activeSpaceId: spaceId,
       view: 'workspace',
+      projectSpaces: state.projectSpaces.map((space) =>
+        space.id === spaceId
+          ? {
+              ...space,
+              updatedAt: now,
+            }
+          : space,
+      ),
       settings: {
         ...state.settings,
         lastActiveSpaceId: spaceId,
@@ -657,6 +667,18 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           ? {
               ...space,
               displayName: displayName.trim() || space.displayName,
+              updatedAt: new Date().toISOString(),
+            }
+          : space,
+      ),
+    })),
+  toggleSpacePinned: (spaceId) =>
+    set((state) => ({
+      projectSpaces: state.projectSpaces.map((space) =>
+        space.id === spaceId
+          ? {
+              ...space,
+              pinned: !space.pinned,
               updatedAt: new Date().toISOString(),
             }
           : space,

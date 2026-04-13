@@ -195,6 +195,17 @@ button {
   white-space: nowrap;
 }
 
+.tab-strip__controls {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.tab-strip__control {
+  height: 32px;
+  width: 32px;
+}
+
 .tab-strip__track {
   display: flex;
   gap: 8px;
@@ -245,6 +256,11 @@ button {
   flex: 0 0 auto;
   justify-content: center;
   padding: 0 14px;
+}
+
+.tab-chip--overflow {
+  flex: 0 0 auto;
+  padding-right: 10px;
 }
 
 .tab-chip__content,
@@ -343,6 +359,12 @@ button {
   color: var(--text);
 }
 
+.tab-chip__icon.is-active {
+  background: rgba(79, 146, 255, 0.1);
+  border-color: rgba(105, 147, 223, 0.4);
+  color: var(--accent-strong);
+}
+
 .tab-chip__input {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(131, 150, 184, 0.2);
@@ -351,6 +373,90 @@ button {
   min-width: 0;
   padding: 4px 8px;
   width: 100%;
+}
+
+.tab-overflow {
+  position: static;
+}
+
+.tab-overflow-overlay {
+  inset: 0;
+  position: fixed;
+  z-index: 25;
+}
+
+.tab-overflow__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(420px, calc(100vh - 88px));
+  overflow: auto;
+  padding: 8px;
+  position: fixed;
+  z-index: 26;
+}
+
+.tab-overflow__row {
+  align-items: stretch;
+  display: flex;
+  gap: 8px;
+}
+
+.tab-overflow__entry {
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(76, 94, 124, 0.16);
+  color: var(--text);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.tab-overflow__entry:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(120, 148, 203, 0.3);
+}
+
+.tab-overflow__label-row,
+.tab-overflow__actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.tab-overflow__label {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.tab-overflow__path {
+  color: var(--text-faint);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-overflow__actions {
+  flex: 0 0 auto;
+}
+
+.tab-overflow__pill,
+.space-switcher__pill {
+  background: rgba(79, 146, 255, 0.12);
+  border: 1px solid rgba(105, 147, 223, 0.22);
+  color: var(--accent-strong);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 6px;
+  text-transform: uppercase;
 }
 
 .warning-stack {
@@ -425,6 +531,125 @@ button {
   align-items: center;
   display: flex;
   gap: 10px;
+}
+
+.space-switcher-overlay {
+  align-items: flex-start;
+  background: rgba(3, 6, 10, 0.56);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 72px 20px 20px;
+  position: absolute;
+  z-index: 30;
+}
+
+.space-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(560px, calc(100vh - 120px));
+  max-width: 720px;
+  padding: 16px;
+  width: min(720px, calc(100vw - 40px));
+}
+
+.space-switcher__header,
+.space-switcher__title,
+.space-switcher__item-meta {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.space-switcher__header {
+  justify-content: space-between;
+}
+
+.space-switcher__title {
+  min-width: 0;
+}
+
+.space-switcher__title strong {
+  display: block;
+  font-size: 0.96rem;
+}
+
+.space-switcher__input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(131, 150, 184, 0.2);
+  color: var(--text);
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.space-switcher__input:focus {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px rgba(79, 146, 255, 0.12);
+}
+
+.space-switcher__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 120px;
+  overflow: auto;
+}
+
+.space-switcher__item {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(76, 94, 124, 0.16);
+  color: var(--text);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 12px 14px;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.space-switcher__item.is-selected,
+.space-switcher__item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(120, 148, 203, 0.32);
+}
+
+.space-switcher__item-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.space-switcher__item-copy strong {
+  font-size: 0.9rem;
+}
+
+.space-switcher__item-copy span {
+  color: var(--text-faint);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-switcher__item-meta {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.space-switcher__empty {
+  align-items: center;
+  color: var(--text-soft);
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-height: 120px;
 }
 
 .configurator,
@@ -1349,6 +1574,23 @@ select.field__input option {
 
   .settings-update__actions {
     flex-wrap: wrap;
+  }
+
+  .space-switcher-overlay {
+    padding: 56px 12px 12px;
+  }
+
+  .space-switcher {
+    width: calc(100vw - 24px);
+  }
+
+  .space-switcher__item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .space-switcher__item-meta {
+    justify-content: flex-start;
   }
 }
 

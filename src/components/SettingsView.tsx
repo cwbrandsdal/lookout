@@ -235,6 +235,15 @@ export function SettingsView() {
           </label>
         </div>
 
+        <label className="toggle">
+          <input
+            checked={settings.showPinnedTabsOnly}
+            onChange={(event) => updateSettings({ showPinnedTabsOnly: event.target.checked })}
+            type="checkbox"
+          />
+          <span>Show only pinned spaces in the top tab bar, with the rest under More.</span>
+        </label>
+
         <p className="muted-copy">
           {fontStatus === 'loading'
             ? 'Loading installed fonts from Windows...'
