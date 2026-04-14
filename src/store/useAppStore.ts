@@ -10,8 +10,11 @@ import {
   createProjectSpaceFromDraft,
   createPreset,
   deriveDisplayNameFromPath,
+  getDefaultStartupCommandForRole,
   getNextTemplateForPaneCount,
   getRoleDefinition,
+  isManagedStartupCommandForRole,
+  isYoloStartupCommand,
   makeDraftFromPreset,
   makeDraftFromSpace,
   removePaneFromLayoutTree,
@@ -60,6 +63,7 @@ interface AppStoreState {
   updateDraft: (patch: Partial<ProjectSpaceDraft>) => void;
   setDraftLayout: (layoutId: LayoutTemplateId) => void;
   updateDraftPane: (paneId: string, patch: DraftPanePatch) => void;
+  updateSpacePane: (spaceId: string, paneId: string, patch: DraftPanePatch) => void;
   applyPresetToDraft: (presetId: string) => void;
   saveDraftAsPreset: (name: string, description: string) => Preset | null;
   updatePresetFromDraft: (presetId: string, name?: string, description?: string) => void;
@@ -193,32 +197,22 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return {
         draft: {
           ...state.draft,
-          paneDefinitions: state.draft.paneDefinitions.map((pane) => {
-            if (pane.id !== paneId) {
-              return pane;
-            }
-
-            const role = getRoleDefinition(patch.roleId ?? pane.roleId, roles);
-            return {
-              ...pane,
-              ...patch,
-              title:
-                typeof patch.title === 'string'
-                  ? patch.title
-                  : patch.roleId && pane.title === getRoleDefinition(pane.roleId, roles).displayName
-                    ? role.displayName
-                    : pane.title,
-              startupCommand:
-                patch.startupCommand !== undefined
-                  ? patch.startupCommand
-                  : patch.roleId && pane.startupCommand === getRoleDefinition(pane.roleId, roles).defaultStartupCommand
-                    ? role.defaultStartupCommand
-                    : pane.startupCommand,
-            };
-          }),
+          paneDefinitions: state.draft.paneDefinitions.map((pane) => applyPanePatch(pane, patch, roles, paneId)),
         },
       };
     }),
+  updateSpacePane: (spaceId, paneId, patch) =>
+    set((state) => ({
+      projectSpaces: state.projectSpaces.map((space) =>
+        space.id === spaceId
+          ? {
+              ...space,
+              paneDefinitions: space.paneDefinitions.map((pane) => applyPanePatch(pane, patch, state.roles, paneId)),
+              updatedAt: new Date().toISOString(),
+            }
+          : space,
+      ),
+    })),
   applyPresetToDraft: (presetId) => {
     const preset = get().presets.find((entry) => entry.id === presetId);
     if (!preset) {
@@ -384,7 +378,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         return;
       }
 
-      const nextPane = createPaneDefinition(space.paneDefinitions.length, roleId);
+      const nextPane = createPendingPaneDefinition(space.paneDefinitions.length, roleId);
       const splitDirection = getSuggestedSplitDirection(space.layoutTree);
       const updatedSpace: ProjectSpace = {
         ...space,
@@ -409,7 +403,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     const nextPaneDefinitions = [...space.paneDefinitions];
     while (nextPaneDefinitions.length < nextTemplate.count) {
-      nextPaneDefinitions.push(createPaneDefinition(nextPaneDefinitions.length, roleId));
+      nextPaneDefinitions.push(createPendingPaneDefinition(nextPaneDefinitions.length, roleId));
     }
 
     const updatedSpace: ProjectSpace = {
@@ -478,7 +472,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return;
     }
 
-    const nextPane = createPaneDefinition(space.paneDefinitions.length, sourcePane.roleId);
+    const nextPane = createPendingPaneDefinition(space.paneDefinitions.length, sourcePane.roleId, sourcePane);
     const baseLayoutTree = space.layoutTree ?? buildLayoutTreeFromTemplate(space.layoutTemplateId, space.paneDefinitions.map((pane) => pane.id));
     if (!baseLayoutTree) {
       return;
@@ -876,6 +870,63 @@ async function startPaneSession(
   }));
 
   return response;
+}
+
+function applyPanePatch(
+  pane: PaneDefinition,
+  patch: DraftPanePatch,
+  roles: RoleDefinition[],
+  targetPaneId: string,
+): PaneDefinition {
+  if (pane.id !== targetPaneId) {
+    return pane;
+  }
+
+  const currentRole = getRoleDefinition(pane.roleId, roles);
+  const role = getRoleDefinition(patch.roleId ?? pane.roleId, roles);
+  const effectiveStartupCommand = pane.startupCommand ?? currentRole.defaultStartupCommand;
+  const nextStartupCommand =
+    patch.startupCommand !== undefined
+      ? patch.startupCommand
+      : patch.roleId && isManagedStartupCommandForRole(currentRole.id, effectiveStartupCommand, roles)
+        ? getDefaultStartupCommandForRole(role.id, isYoloStartupCommand(currentRole.id, effectiveStartupCommand), roles)
+        : pane.startupCommand;
+
+  return {
+    ...pane,
+    ...patch,
+    title:
+      typeof patch.title === 'string'
+        ? patch.title
+        : patch.roleId && pane.title === currentRole.displayName
+          ? role.displayName
+          : pane.title,
+    startupCommand: nextStartupCommand,
+  };
+}
+
+function createPendingPaneDefinition(index: number, roleId?: string, sourcePane?: PaneDefinition): PaneDefinition {
+  const basePane = createPaneDefinition(index, roleId);
+  if (!sourcePane) {
+    return {
+      ...basePane,
+      autoStart: false,
+      needsSetup: true,
+    };
+  }
+
+  return {
+    ...basePane,
+    title: sourcePane.title,
+    roleId: sourcePane.roleId,
+    executable: sourcePane.executable,
+    arguments: [...sourcePane.arguments],
+    workingDirectory: sourcePane.workingDirectory,
+    startupCommand: sourcePane.startupCommand,
+    envVars: { ...sourcePane.envVars },
+    autoStart: false,
+    needsSetup: true,
+  };
 }
 
 function addRecentProjectPath(paths: string[], nextPath: string): string[] {

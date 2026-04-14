@@ -8,7 +8,15 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { useAppStore } from '../store/useAppStore';
 import { getTerminalBuffer, subscribeToTerminalStream } from '../services/terminal-stream';
-import { getRoleDefinition, type PaneDefinition, type ProjectSpace } from '../types/app';
+import {
+  getDefaultStartupCommandForRole,
+  getRoleDefinition,
+  getYoloStartupCommand,
+  isYoloStartupCommand,
+  supportsYoloMode,
+  type PaneDefinition,
+  type ProjectSpace,
+} from '../types/app';
 import type { GitInfoResponse } from '../types/electron-api';
 
 interface TerminalPaneProps {
@@ -75,13 +83,15 @@ export function TerminalPane({
   onToggleMaximize,
   isMaximized = false,
 }: TerminalPaneProps) {
-  const { runtimeFromStore, role, launchPane, stopPane, clearPaneBuffer } = useAppStore(
+  const { runtimeFromStore, role, roles, launchPane, stopPane, clearPaneBuffer, updateSpacePane } = useAppStore(
     useShallow((state) => ({
       runtimeFromStore: state.sessionStateByPaneId[pane.id],
       role: getRoleDefinition(pane.roleId, state.roles),
+      roles: state.roles,
       launchPane: state.launchPane,
       stopPane: state.stopPane,
       clearPaneBuffer: state.clearPaneBuffer,
+      updateSpacePane: state.updateSpacePane,
     })),
   );
   const terminalFontFace = useAppStore((state) => state.settings.terminalFontFace);
@@ -97,6 +107,7 @@ export function TerminalPane({
   const recentPasteWriteRef = useRef<{ text: string; at: number } | null>(null);
   const [gitInfo, setGitInfo] = useState<GitInfoResponse>(NO_GIT_INFO);
   const isDraggable = !isMaximized && Boolean(onDragStart || onDragEnd);
+  const isSetupMode = pane.needsSetup;
 
   async function writeClipboardText(text: string) {
     const sessionId = sessionIdRef.current;
@@ -119,6 +130,10 @@ export function TerminalPane({
   }
 
   async function launchWithCurrentSize(clearBuffer = true) {
+    if (isSetupMode) {
+      return;
+    }
+
     const terminal = terminalRef.current;
     if (!terminal) {
       return;
@@ -132,6 +147,10 @@ export function TerminalPane({
   }
 
   async function restartWithCurrentSize() {
+    if (isSetupMode) {
+      return;
+    }
+
     const sessionId = sessionIdRef.current;
     if (sessionId) {
       await window.lookout.stopTerminalSession(sessionId);
@@ -140,12 +159,19 @@ export function TerminalPane({
     await launchWithCurrentSize(true);
   }
 
+  function handleCompleteSetup() {
+    updateSpacePane(space.id, pane.id, {
+      autoStart: true,
+      needsSetup: false,
+    });
+  }
+
   useEffect(() => {
     sessionIdRef.current = runtime.sessionId;
   }, [runtime.sessionId]);
 
   useEffect(() => {
-    if (!containerRef.current || terminalRef.current) {
+    if (isSetupMode || !containerRef.current || terminalRef.current) {
       return;
     }
 
@@ -251,9 +277,13 @@ export function TerminalPane({
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, []);
+  }, [isSetupMode]);
 
   useEffect(() => {
+    if (isSetupMode) {
+      return;
+    }
+
     const terminal = terminalRef.current;
     if (!terminal) {
       return;
@@ -273,7 +303,7 @@ export function TerminalPane({
 
       terminal.write(event.data);
     });
-  }, [pane.id]);
+  }, [isSetupMode, pane.id]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -317,7 +347,7 @@ export function TerminalPane({
         rows: terminal.rows,
       });
     }
-  }, [launchPane, pane.autoStart, pane.id, runtime.sessionId, runtime.status, space.id]);
+  }, [isSetupMode, launchPane, pane.autoStart, pane.id, runtime.sessionId, runtime.status, space.id]);
 
   const effectivePath = runtime.cwd ?? pane.workingDirectory ?? space.rootPath;
   const overlayMessage =
@@ -327,6 +357,11 @@ export function TerminalPane({
 
   useEffect(() => {
     let isMounted = true;
+
+    if (isSetupMode) {
+      setGitInfo(NO_GIT_INFO);
+      return;
+    }
 
     async function refreshGitInfo() {
       if (!effectivePath.trim()) {
@@ -357,7 +392,7 @@ export function TerminalPane({
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [effectivePath, runtime.status]);
+  }, [effectivePath, isSetupMode, runtime.status]);
 
   function handleCopy(event: ReactClipboardEvent<HTMLDivElement>) {
     const selectedText = terminalRef.current?.getSelection() ?? '';
@@ -407,7 +442,7 @@ export function TerminalPane({
           <span className="role-tag" style={{ borderColor: role.accent, color: role.accent }}>
             {role.displayName}
           </span>
-          <span className={`status-pill status-pill--${runtime.status}`}>{runtime.status}</span>
+          <span className={`status-pill status-pill--${isSetupMode ? 'setup' : runtime.status}`}>{isSetupMode ? 'setup' : runtime.status}</span>
           {onToggleMaximize ? (
             <button
               className="icon-button"
@@ -440,12 +475,16 @@ export function TerminalPane({
               ) : null}
             </>
           ) : null}
-          <button className="icon-button" draggable={false} onClick={() => void restartWithCurrentSize()} type="button">
-            <RefreshCcw size={14} />
-          </button>
-          <button className="icon-button" draggable={false} onClick={() => clearPaneBuffer(pane.id)} type="button">
-            <Trash2 size={14} />
-          </button>
+          {!isSetupMode ? (
+            <>
+              <button className="icon-button" draggable={false} onClick={() => void restartWithCurrentSize()} type="button">
+                <RefreshCcw size={14} />
+              </button>
+              <button className="icon-button" draggable={false} onClick={() => clearPaneBuffer(pane.id)} type="button">
+                <Trash2 size={14} />
+              </button>
+            </>
+          ) : null}
           <button
             className="icon-button"
             draggable={false}
@@ -457,7 +496,7 @@ export function TerminalPane({
           <button className="icon-button" draggable={false} onClick={() => void window.lookout.openPath(effectivePath)} type="button">
             <FolderOpen size={14} />
           </button>
-          {runtime.sessionId ? (
+          {!isSetupMode && runtime.sessionId ? (
             <button
               className="icon-button icon-button--danger"
               draggable={false}
@@ -466,7 +505,7 @@ export function TerminalPane({
             >
               <Square size={14} />
             </button>
-          ) : (
+          ) : !isSetupMode ? (
             <button
               className="icon-button icon-button--primary"
               draggable={false}
@@ -475,34 +514,100 @@ export function TerminalPane({
             >
               <Play size={14} />
             </button>
-          )}
+          ) : null}
         </div>
       </header>
 
       <div className="terminal-pane__body">
-        <div
-          onCopy={handleCopy}
-          className="terminal-pane__viewport"
-          onClick={() => terminalRef.current?.focus()}
-          onMouseDown={() => terminalRef.current?.focus()}
-          ref={containerRef}
-          tabIndex={0}
-        />
-        {!runtime.sessionId && runtime.status !== 'running' ? (
-          <div className="terminal-pane__overlay">
-            <p>{overlayMessage}</p>
-            <button
-              className="button button--ghost"
-              disabled={runtime.status === 'starting'}
-              onClick={() => void launchWithCurrentSize()}
-              type="button"
-            >
-              <Play size={16} />
-              Launch session
-            </button>
+        {isSetupMode ? (
+          <div className="pane-setup">
+            <div className="pane-setup__copy">
+              <strong>Configure this pane before first launch.</strong>
+              <p>Choose the agent, optional YOLO mode, and the path this pane should start in.</p>
+            </div>
+
+            <div className="pane-setup__grid">
+              <label className="field">
+                <span className="field__label">Role / agent</span>
+                <select
+                  className="field__input"
+                  onChange={(event) => updateSpacePane(space.id, pane.id, { roleId: event.target.value })}
+                  value={pane.roleId}
+                >
+                  {roles.map((availableRole) => (
+                    <option key={availableRole.id} value={availableRole.id}>
+                      {availableRole.displayName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span className="field__label">Path</span>
+                <input
+                  className="field__input"
+                  onChange={(event) => updateSpacePane(space.id, pane.id, { workingDirectory: event.target.value })}
+                  placeholder={space.rootPath}
+                  value={pane.workingDirectory ?? ''}
+                />
+              </label>
+            </div>
+
+            {supportsYoloMode(role.id) && getYoloStartupCommand(role.id) ? (
+              <label className="toggle">
+                <input
+                  checked={isYoloStartupCommand(role.id, pane.startupCommand ?? role.defaultStartupCommand)}
+                  onChange={(event) =>
+                    updateSpacePane(space.id, pane.id, {
+                      startupCommand: getDefaultStartupCommandForRole(role.id, event.target.checked, roles) ?? '',
+                    })
+                  }
+                  type="checkbox"
+                />
+                <span>{eventualYoloLabel(role.displayName)}</span>
+              </label>
+            ) : null}
+
+            <p className="pane-setup__meta">Root path: {space.rootPath}</p>
+
+            <div className="pane-setup__actions">
+              <button className="button button--primary" onClick={handleCompleteSetup} type="button">
+                <Play size={16} />
+                Save and open pane
+              </button>
+            </div>
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div
+              onCopy={handleCopy}
+              className="terminal-pane__viewport"
+              onClick={() => terminalRef.current?.focus()}
+              onMouseDown={() => terminalRef.current?.focus()}
+              ref={containerRef}
+              tabIndex={0}
+            />
+            {!runtime.sessionId && runtime.status !== 'running' ? (
+              <div className="terminal-pane__overlay">
+                <p>{overlayMessage}</p>
+                <button
+                  className="button button--ghost"
+                  disabled={runtime.status === 'starting'}
+                  onClick={() => void launchWithCurrentSize()}
+                  type="button"
+                >
+                  <Play size={16} />
+                  Launch session
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
     </article>
   );
+}
+
+function eventualYoloLabel(roleDisplayName: string): string {
+  return `YOLO mode for ${roleDisplayName}.`;
 }

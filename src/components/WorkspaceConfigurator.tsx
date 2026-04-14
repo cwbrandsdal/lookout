@@ -3,7 +3,16 @@ import { FolderOpen, LayoutGrid, Rocket, Save, Sparkles } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useAppStore } from '../store/useAppStore';
-import { LAYOUT_TEMPLATES, deriveDisplayNameFromPath, getLayoutTemplate, getRoleDefinition } from '../types/app';
+import {
+  LAYOUT_TEMPLATES,
+  deriveDisplayNameFromPath,
+  getDefaultStartupCommandForRole,
+  getLayoutTemplate,
+  getRoleDefinition,
+  getYoloStartupCommand,
+  isYoloStartupCommand,
+  supportsYoloMode,
+} from '../types/app';
 
 export function WorkspaceConfigurator() {
   const {
@@ -281,6 +290,9 @@ export function WorkspaceConfigurator() {
             <div className="pane-editor-list">
               {draft.paneDefinitions.map((pane, index) => {
                 const role = getRoleDefinition(pane.roleId, roles);
+                const yoloSupported = supportsYoloMode(role.id);
+                const yoloStartupCommand = getYoloStartupCommand(role.id);
+                const yoloEnabled = isYoloStartupCommand(role.id, pane.startupCommand ?? role.defaultStartupCommand);
                 return (
                   <article key={pane.id} className="pane-editor">
                     <div className="pane-editor__heading">
@@ -358,6 +370,24 @@ export function WorkspaceConfigurator() {
                         />
                       </label>
                     </div>
+
+                    {yoloSupported && yoloStartupCommand ? (
+                      <div className="pane-editor__inline-options">
+                        <label className="toggle">
+                          <input
+                            checked={yoloEnabled}
+                            onChange={(event) =>
+                              updateDraftPane(pane.id, {
+                                startupCommand: getDefaultStartupCommandForRole(role.id, event.target.checked, roles) ?? '',
+                              })
+                            }
+                            type="checkbox"
+                          />
+                          <span>YOLO mode for {role.displayName}.</span>
+                        </label>
+                        <p className="muted-copy">Uses `{yoloStartupCommand}` as the startup command.</p>
+                      </div>
+                    ) : null}
 
                     <div className="pane-editor__grid pane-editor__grid--single">
                       <label className="field">

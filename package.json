@@ -1,7 +1,7 @@
 {
   "name": "lookout",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "productName": "Lookout",
   "author": "Christopher Brandsdal",
   "description": "Lookout desktop workspace organizer for multi-terminal project spaces.",

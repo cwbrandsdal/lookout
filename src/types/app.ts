@@ -52,6 +52,7 @@ export interface PaneDefinition {
   startupCommand?: string;
   envVars: Record<string, string>;
   autoStart: boolean;
+  needsSetup: boolean;
 }
 
 export interface ProjectSpace {
@@ -277,6 +278,11 @@ export const DEFAULT_ROLE_DEFINITIONS: RoleDefinition[] = [
   },
 ];
 
+const YOLO_STARTUP_COMMAND_BY_ROLE_ID: Record<string, string> = {
+  'claude-code': 'claude --dangerously-skip-permissions',
+  codex: 'codex --dangerously-bypass-approvals-and-sandbox',
+};
+
 const DEFAULT_ROLE_SEQUENCE = [
   'claude-code',
   'claude-code',
@@ -304,6 +310,46 @@ export function getRoleDefinition(roleId: string, roles: RoleDefinition[] = DEFA
   return roles.find((role) => role.id === roleId) ?? DEFAULT_ROLE_DEFINITIONS[0];
 }
 
+export function supportsYoloMode(roleId: string): boolean {
+  return roleId in YOLO_STARTUP_COMMAND_BY_ROLE_ID;
+}
+
+export function getYoloStartupCommand(roleId: string): string | undefined {
+  return YOLO_STARTUP_COMMAND_BY_ROLE_ID[roleId];
+}
+
+export function getDefaultStartupCommandForRole(
+  roleId: string,
+  yoloMode = false,
+  roles: RoleDefinition[] = DEFAULT_ROLE_DEFINITIONS,
+): string | undefined {
+  if (yoloMode) {
+    return getYoloStartupCommand(roleId) ?? getRoleDefinition(roleId, roles).defaultStartupCommand;
+  }
+
+  return getRoleDefinition(roleId, roles).defaultStartupCommand;
+}
+
+export function isYoloStartupCommand(roleId: string, startupCommand?: string): boolean {
+  const yoloStartupCommand = getYoloStartupCommand(roleId);
+  return Boolean(yoloStartupCommand) && startupCommand?.trim() === yoloStartupCommand;
+}
+
+export function isManagedStartupCommandForRole(
+  roleId: string,
+  startupCommand?: string,
+  roles: RoleDefinition[] = DEFAULT_ROLE_DEFINITIONS,
+): boolean {
+  const normalizedStartupCommand = startupCommand?.trim();
+  if (!normalizedStartupCommand) {
+    return false;
+  }
+
+  const standardStartupCommand = getRoleDefinition(roleId, roles).defaultStartupCommand?.trim();
+  const yoloStartupCommand = getYoloStartupCommand(roleId);
+  return normalizedStartupCommand === standardStartupCommand || normalizedStartupCommand === yoloStartupCommand;
+}
+
 export function createPaneDefinition(index: number, roleId?: string): PaneDefinition {
   const resolvedRoleId = roleId ?? DEFAULT_ROLE_SEQUENCE[index % DEFAULT_ROLE_SEQUENCE.length];
   const role = getRoleDefinition(resolvedRoleId);
@@ -317,6 +363,7 @@ export function createPaneDefinition(index: number, roleId?: string): PaneDefini
     startupCommand: role.defaultStartupCommand,
     envVars: {},
     autoStart: true,
+    needsSetup: false,
   };
 }
 
@@ -513,6 +560,7 @@ export function normalizePaneDefinition(input: Partial<PaneDefinition>): PaneDef
       typeof input.startupCommand === 'string' ? input.startupCommand : role.defaultStartupCommand,
     envVars: isStringRecord(input.envVars) ? input.envVars : {},
     autoStart: typeof input.autoStart === 'boolean' ? input.autoStart : true,
+    needsSetup: typeof input.needsSetup === 'boolean' ? input.needsSetup : false,
   };
 }
 

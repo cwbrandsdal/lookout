@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FolderKanban, Minus, MoreHorizontal, Pin, Plus, Search, Settings2, Square, X } from 'lucide-react';
+import { Minus, MoreHorizontal, Pin, Plus, Search, Settings2, Square, X } from 'lucide-react';
 
+import lookoutLogo from '../assets/lookout-app-icon.png';
 import type { ProjectSpace } from '../types/app';
 
 interface TabStripProps {
@@ -81,9 +82,8 @@ export function TabStrip({
 
   return (
     <header className="tab-strip">
-      <div className="brand-pill no-drag">
-        <FolderKanban size={16} />
-        <span>Lookout</span>
+      <div className="brand-mark no-drag">
+        <img alt="" aria-hidden="true" className="brand-mark__image" src={lookoutLogo} />
       </div>
 
       <div className="tab-strip__controls no-drag">

@@ -182,17 +182,19 @@ button {
   -webkit-app-region: no-drag;
 }
 
-.brand-pill {
+.brand-mark {
   align-items: center;
-  background: linear-gradient(180deg, rgba(24, 34, 50, 0.88), rgba(12, 18, 28, 0.86));
-  border: 1px solid rgba(105, 147, 223, 0.22);
-  border-radius: 0;
-  color: var(--text);
   display: inline-flex;
-  gap: 8px;
+  flex: 0 0 auto;
   height: 32px;
-  padding: 0 12px;
-  white-space: nowrap;
+  justify-content: center;
+  width: 32px;
+}
+
+.brand-mark__image {
+  display: block;
+  height: 28px;
+  width: 28px;
 }
 
 .tab-strip__controls {
@@ -1076,6 +1078,12 @@ select.field__input option {
   padding: 18px;
 }
 
+.pane-editor__inline-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .pane-editor__heading,
 .terminal-pane__header,
 .terminal-pane__title-row {
@@ -1461,6 +1469,11 @@ select.field__input option {
   color: var(--warning);
 }
 
+.status-pill--setup {
+  background: rgba(95, 158, 255, 0.14);
+  color: var(--accent-strong);
+}
+
 .status-pill--running {
   background: rgba(114, 215, 172, 0.12);
   color: var(--success);
@@ -1476,6 +1489,43 @@ select.field__input option {
   flex: 1;
   min-height: 0;
   position: relative;
+}
+
+.pane-setup {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  min-height: 0;
+  padding: 20px;
+}
+
+.pane-setup__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pane-setup__copy strong,
+.pane-setup__meta {
+  margin: 0;
+}
+
+.pane-setup__copy p,
+.pane-setup__meta {
+  color: var(--text-soft);
+}
+
+.pane-setup__grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pane-setup__actions {
+  display: flex;
+  gap: 10px;
 }
 
 .terminal-pane__viewport {
@@ -1552,6 +1602,10 @@ select.field__input option {
     flex-direction: column;
     gap: 6px;
     align-items: flex-start;
+  }
+
+  .pane-setup__grid {
+    grid-template-columns: 1fr;
   }
 
   .settings-grid {
