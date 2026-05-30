@@ -193,78 +193,80 @@ function AppContent() {
           spaces={openSpaces}
         />
 
-        {warnings.length ? (
-          <div className="warning-stack">
-            {warnings.map((warning) => (
-              <div key={warning} className="warning-banner">
-                <div className="warning-banner__copy">
-                  <AlertTriangle size={16} />
-                  <span>{warning}</span>
+        <div className="app-shell__workspace">
+          {warnings.length ? (
+            <div className="warning-stack">
+              {warnings.map((warning) => (
+                <div key={warning} className="warning-banner">
+                  <div className="warning-banner__copy">
+                    <AlertTriangle size={16} />
+                    <span>{warning}</span>
+                  </div>
+                  <button className="icon-button" onClick={() => clearWarning(warning)} type="button">
+                    <X size={14} />
+                  </button>
                 </div>
-                <button className="icon-button" onClick={() => clearWarning(warning)} type="button">
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {showUpdateBanner ? (
-          <div className="update-banner">
-            <div className="update-banner__copy">
-              <Download size={16} />
-              <div>
-                <strong>
-                  {appUpdateState.phase === 'downloaded'
-                    ? `Update ${appUpdateState.availableVersion ?? ''} is ready`
-                    : `Update ${appUpdateState.availableVersion ?? ''} is available`}
-                </strong>
-                <span>
-                  {appUpdateState.phase === 'downloaded'
-                    ? 'Restart Lookout to install the downloaded update.'
-                    : 'A newer version was found automatically when the app opened.'}
-                </span>
-              </div>
+              ))}
             </div>
-            <div className="update-banner__actions">
-              {appUpdateState.phase === 'available' ? (
+          ) : null}
+
+          {showUpdateBanner ? (
+            <div className="update-banner">
+              <div className="update-banner__copy">
+                <Download size={16} />
+                <div>
+                  <strong>
+                    {appUpdateState.phase === 'downloaded'
+                      ? `Update ${appUpdateState.availableVersion ?? ''} is ready`
+                      : `Update ${appUpdateState.availableVersion ?? ''} is available`}
+                  </strong>
+                  <span>
+                    {appUpdateState.phase === 'downloaded'
+                      ? 'Restart Lookout to install the downloaded update.'
+                      : 'A newer version was found automatically when the app opened.'}
+                  </span>
+                </div>
+              </div>
+              <div className="update-banner__actions">
+                {appUpdateState.phase === 'available' ? (
+                  <button
+                    className="button button--primary button--compact"
+                    onClick={() => void window.lookout.downloadAppUpdate()}
+                    type="button"
+                  >
+                    Download update
+                  </button>
+                ) : null}
+                {appUpdateState.phase === 'downloaded' ? (
+                  <button
+                    className="button button--primary button--compact"
+                    onClick={() => void window.lookout.installAppUpdate()}
+                    type="button"
+                  >
+                    Restart to install
+                  </button>
+                ) : null}
                 <button
-                  className="button button--primary button--compact"
-                  onClick={() => void window.lookout.downloadAppUpdate()}
+                  className="button button--ghost button--compact"
+                  onClick={() => setDismissedUpdateKey(updateNoticeKey)}
                   type="button"
                 >
-                  Download update
+                  Later
                 </button>
-              ) : null}
-              {appUpdateState.phase === 'downloaded' ? (
-                <button
-                  className="button button--primary button--compact"
-                  onClick={() => void window.lookout.installAppUpdate()}
-                  type="button"
-                >
-                  Restart to install
-                </button>
-              ) : null}
-              <button
-                className="button button--ghost button--compact"
-                onClick={() => setDismissedUpdateKey(updateNoticeKey)}
-                type="button"
-              >
-                Later
-              </button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        <main className="app-shell__main">
-          {view === 'settings' ? (
-            <SettingsView />
-          ) : view === 'configurator' || !activeSpace ? (
-            <WorkspaceConfigurator />
-          ) : (
-            <WorkspaceView space={activeSpace} />
-          )}
-        </main>
+          <main className="app-shell__main">
+            {view === 'settings' ? (
+              <SettingsView />
+            ) : view === 'configurator' || !activeSpace ? (
+              <WorkspaceConfigurator />
+            ) : (
+              <WorkspaceView space={activeSpace} />
+            )}
+          </main>
+        </div>
 
         {spaceSwitcherOpen ? (
           <SpaceSwitcher
