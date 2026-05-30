@@ -145,14 +145,16 @@ export function TabStrip({
                   />
                 ) : (
                   <>
-                    <span className="tab-chip__label">{space.displayName}</span>
-                    <span className="tab-chip__badge">{space.paneDefinitions.length}</span>
+                    <span className="tab-chip__title-row">
+                      <span className="tab-chip__label">{space.displayName}</span>
+                      <span className="tab-chip__badge">{space.paneDefinitions.length}</span>
+                    </span>
+                    <span className="tab-chip__path">{space.rootPath}</span>
                   </>
                 )}
               </div>
 
               <div className="tab-chip__actions">
-                <span className="tab-chip__path">{space.rootPath}</span>
                 <button
                   className={`tab-chip__icon ${space.pinned ? 'is-active' : ''}`}
                   onClick={(event) => {

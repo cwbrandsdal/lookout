@@ -181,7 +181,7 @@ button {
   border: 0;
   border-right: 1px solid rgba(88, 106, 138, 0.18);
   display: flex;
-  flex: 0 0 248px;
+  flex: 0 0 300px;
   flex-direction: column;
   gap: 8px;
   height: 100vh;
@@ -224,7 +224,7 @@ button {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -245,19 +245,20 @@ button {
   display: flex;
   flex: 0 0 auto;
   flex-direction: row;
-  gap: 8px;
-  min-height: 38px;
+  gap: 10px;
+  min-height: 58px;
   align-items: center;
   min-width: 0;
-  padding: 7px 8px 7px 10px;
-  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  padding: 8px 9px 8px 12px;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
   width: 100%;
 }
 
 .tab-chip:hover,
 .tab-chip:focus-visible {
+  background: linear-gradient(180deg, rgba(17, 25, 37, 0.98), rgba(9, 14, 22, 0.98));
   border-color: rgba(120, 148, 203, 0.34);
-  transform: translateY(-1px);
 }
 
 .tab-chip.is-active {
@@ -273,10 +274,13 @@ button {
   flex-direction: row;
   flex: 0 0 auto;
   justify-content: center;
+  min-height: 46px;
   padding: 0 14px;
 }
 
 .tab-chip--overflow {
+  justify-content: flex-start;
+  min-height: 46px;
   padding-right: 10px;
 }
 
@@ -285,20 +289,33 @@ button {
   align-items: center;
   display: flex;
   gap: 8px;
-  justify-content: space-between;
 }
 
 .tab-chip__content {
   flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
   min-width: 0;
 }
 
 .tab-chip__actions {
   flex: 0 0 auto;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.tab-chip__title-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
 }
 
 .tab-chip__label {
-  font-size: 0.88rem;
+  color: var(--text);
+  flex: 1;
+  font-size: 0.86rem;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -310,16 +327,21 @@ button {
   border: 1px solid rgba(79, 146, 255, 0.28);
   border-radius: 999px;
   color: var(--accent-strong);
+  flex: 0 0 auto;
   font-size: 0.68rem;
   font-weight: 700;
+  line-height: 1;
+  min-width: 26px;
   padding: 2px 8px;
+  text-align: center;
 }
 
 .tab-chip__path {
   display: block;
   color: var(--text-faint);
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-  font-size: 0.72rem;
+  font-size: 0.67rem;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -334,8 +356,8 @@ button {
   color: var(--text-soft);
   display: inline-flex;
   justify-content: center;
-  min-height: 22px;
-  min-width: 22px;
+  min-height: 28px;
+  min-width: 28px;
   transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
 }
 
