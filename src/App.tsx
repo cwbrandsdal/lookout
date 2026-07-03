@@ -178,6 +178,7 @@ function AppContent() {
   return (
     <div className="app-shell">
       <div className="app-shell__backdrop" />
+      <div className="window-drag-region" aria-hidden="true" />
       <div className="app-shell__content">
         <TabStrip
           activeSpaceId={activeSpace?.id ?? null}

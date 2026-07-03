@@ -82,7 +82,7 @@ export function TabStrip({
 
   return (
     <header className="tab-strip">
-      <div className="brand-mark no-drag">
+      <div className="brand-mark">
         <img alt="" aria-hidden="true" className="brand-mark__image" src={lookoutLogo} />
       </div>
 
@@ -96,7 +96,7 @@ export function TabStrip({
         </button>
       </div>
 
-      <div className="tab-strip__track no-drag">
+      <div className="tab-strip__track">
         {visibleSpaces.map((space) => {
           const isActive = activeSpaceId === space.id;
           return (

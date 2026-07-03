@@ -76,6 +76,16 @@ button {
   overflow: hidden;
 }
 
+.window-drag-region {
+  -webkit-app-region: drag;
+  height: 36px;
+  left: 300px;
+  position: fixed;
+  right: 126px;
+  top: 0;
+  z-index: 12;
+}
+
 .diagnostic-shell {
   align-items: center;
   display: flex;
@@ -221,6 +231,7 @@ button {
 }
 
 .tab-strip__track {
+  -webkit-app-region: drag;
   display: flex;
   flex: 1;
   flex-direction: column;
