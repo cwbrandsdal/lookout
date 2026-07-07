@@ -3,6 +3,7 @@ import { autoUpdater } from 'electron-updater';
 import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { loadPersistedState, savePersistedState } from './persistence';
@@ -215,6 +216,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('lookout:open-path', async (_event, inputPath: string) => {
     await shell.openPath(inputPath);
+  });
+
+  ipcMain.handle('lookout:open-in-vscode', async (_event, inputPath: string) => {
+    await openInVsCode(inputPath);
   });
 
   ipcMain.handle('lookout:window-minimize', async () => {
@@ -549,4 +554,64 @@ function parseGitBranch(headerLine: string): { branch: string; isDetached: boole
     branch,
     isDetached: false,
   };
+}
+
+async function openInVsCode(inputPath: string): Promise<void> {
+  const trimmedPath = inputPath.trim();
+  if (!trimmedPath) {
+    throw new Error('Path is required.');
+  }
+
+  const targetPath = path.resolve(trimmedPath);
+  await access(targetPath);
+
+  if (await tryOpenInVsCodeWithCommand(targetPath)) {
+    return;
+  }
+
+  await shell.openExternal(createVsCodeFileUri(targetPath));
+}
+
+async function tryOpenInVsCodeWithCommand(targetPath: string): Promise<boolean> {
+  const candidates = getVsCodeCommandCandidates();
+
+  for (const candidate of candidates) {
+    try {
+      await execFileAsync(candidate.command, [...candidate.args, targetPath], { windowsHide: true });
+      return true;
+    } catch {
+      // Try the next known VS Code launch path before falling back to the URL handler.
+    }
+  }
+
+  return false;
+}
+
+function getVsCodeCommandCandidates(): Array<{ command: string; args: string[] }> {
+  if (process.platform !== 'win32') {
+    return [{ command: 'code', args: [] }];
+  }
+
+  return [
+    process.env.LOCALAPPDATA
+      ? { command: path.join(process.env.LOCALAPPDATA, 'Programs', 'Microsoft VS Code', 'Code.exe'), args: [] }
+      : null,
+    process.env.LOCALAPPDATA
+      ? { command: path.join(process.env.LOCALAPPDATA, 'Programs', 'Microsoft VS Code Insiders', 'Code - Insiders.exe'), args: [] }
+      : null,
+    process.env.ProgramFiles ? { command: path.join(process.env.ProgramFiles, 'Microsoft VS Code', 'Code.exe'), args: [] } : null,
+    process.env['ProgramFiles(x86)']
+      ? { command: path.join(process.env['ProgramFiles(x86)'], 'Microsoft VS Code', 'Code.exe'), args: [] }
+      : null,
+    { command: resolveCmdExecutable(), args: ['/d', '/s', '/c', 'code'] },
+  ].filter((candidate): candidate is { command: string; args: string[] } => Boolean(candidate));
+}
+
+function createVsCodeFileUri(targetPath: string): string {
+  return `vscode://file${pathToFileURL(targetPath).pathname}`;
+}
+
+function resolveCmdExecutable(): string {
+  const systemRoot = process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows';
+  return path.join(systemRoot, 'System32', 'cmd.exe');
 }

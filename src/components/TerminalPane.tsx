@@ -1,7 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Columns2, Copy, FolderOpen, GitBranch, Maximize2, Minimize2, Play, RefreshCcw, Rows2, Square, Trash2, X } from 'lucide-react';
+import {
+  Columns2,
+  Copy,
+  FolderOpen,
+  GitBranch,
+  Maximize2,
+  Minimize2,
+  Play,
+  RefreshCcw,
+  Rows2,
+  Square,
+  SquareCode,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import { useShallow } from 'zustand/react/shallow';
@@ -108,6 +122,7 @@ export function TerminalPane({
   const [gitInfo, setGitInfo] = useState<GitInfoResponse>(NO_GIT_INFO);
   const isDraggable = !isMaximized && Boolean(onDragStart || onDragEnd);
   const isSetupMode = pane.needsSetup;
+  const displayedGitInfo = isSetupMode ? NO_GIT_INFO : gitInfo;
 
   async function writeClipboardText(text: string) {
     const sessionId = sessionIdRef.current;
@@ -359,7 +374,6 @@ export function TerminalPane({
     let isMounted = true;
 
     if (isSetupMode) {
-      setGitInfo(NO_GIT_INFO);
       return;
     }
 
@@ -428,11 +442,11 @@ export function TerminalPane({
         <div className="terminal-pane__meta">
           {DragHandleIcon ? <DragHandleIcon className="terminal-pane__drag-handle" size={12} /> : null}
           <strong className="terminal-pane__title">{pane.title || role.displayName}</strong>
-          {gitInfo.ok ? (
-            <span className={`terminal-pane__git ${gitInfo.isDirty ? 'is-dirty' : ''}`} title={gitInfo.repoRoot}>
+          {displayedGitInfo.ok ? (
+            <span className={`terminal-pane__git ${displayedGitInfo.isDirty ? 'is-dirty' : ''}`} title={displayedGitInfo.repoRoot}>
               <GitBranch size={11} />
-              <span>{gitInfo.branch}</span>
-              {gitInfo.isDirty ? <em>*</em> : null}
+              <span>{displayedGitInfo.branch}</span>
+              {displayedGitInfo.isDirty ? <em>*</em> : null}
             </span>
           ) : null}
           <span className="terminal-pane__path">{effectivePath}</span>
@@ -495,6 +509,16 @@ export function TerminalPane({
           </button>
           <button className="icon-button" draggable={false} onClick={() => void window.lookout.openPath(effectivePath)} type="button">
             <FolderOpen size={14} />
+          </button>
+          <button
+            aria-label="Open in VS Code"
+            className="icon-button"
+            draggable={false}
+            onClick={() => void window.lookout.openInVsCode(effectivePath)}
+            title="Open in VS Code"
+            type="button"
+          >
+            <SquareCode size={14} />
           </button>
           {!isSetupMode && runtime.sessionId ? (
             <button

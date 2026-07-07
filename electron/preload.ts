@@ -14,6 +14,7 @@ const api: LookoutApi = {
   pickDirectory: (initialPath) => ipcRenderer.invoke('lookout:pick-directory', initialPath),
   validateDirectory: (inputPath) => ipcRenderer.invoke('lookout:validate-directory', inputPath),
   openPath: (inputPath) => ipcRenderer.invoke('lookout:open-path', inputPath),
+  openInVsCode: (inputPath) => ipcRenderer.invoke('lookout:open-in-vscode', inputPath),
   minimizeWindow: () => ipcRenderer.invoke('lookout:window-minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('lookout:window-toggle-maximize'),
   closeWindow: () => ipcRenderer.invoke('lookout:window-close'),

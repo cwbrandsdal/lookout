@@ -57,6 +57,7 @@ export interface LookoutApi {
   pickDirectory: (initialPath?: string) => Promise<string | null>;
   validateDirectory: (inputPath: string) => Promise<ValidationResponse>;
   openPath: (inputPath: string) => Promise<void>;
+  openInVsCode: (inputPath: string) => Promise<void>;
   minimizeWindow: () => Promise<void>;
   toggleMaximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;

@@ -20,7 +20,7 @@ Each top tab is a real project-space folder on disk. Each project space contains
 - Pane roles for Claude Code, Codex, Build, Git, Test, Logs, Notes, and general PowerShell
 - Preset save/load/update/delete flow
 - Restorable open tabs, recent paths, theme/settings, and window bounds
-- Path validation, pane restart/stop/clear, copy path, and open folder actions
+- Path validation, pane restart/stop/clear, copy path, open folder, and open in VS Code actions
 
 ## Local Development
 
