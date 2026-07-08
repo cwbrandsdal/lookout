@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Download, FolderKanban, RefreshCw, Search, X } from 'lucide-react';
+import { AlertTriangle, Download, FolderKanban, Minus, RefreshCw, Search, Square, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { TabStrip } from './components/TabStrip';
@@ -282,6 +282,10 @@ function AppContent() {
           </main>
         </div>
 
+        {/* Rendered after every drag-region element so the no-drag subtraction
+            is applied last during Chromium's DOM-order region computation. */}
+        <WindowControls />
+
         {spaceSwitcherOpen ? (
           <SpaceSwitcher
             activeSpaceId={activeSpaceId}
@@ -299,6 +303,32 @@ function AppContent() {
           />
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function WindowControls() {
+  return (
+    <div className="window-controls no-drag">
+      <button className="window-control-button" onClick={() => void window.lookout.minimizeWindow()} title="Minimize" type="button">
+        <Minus size={14} />
+      </button>
+      <button
+        className="window-control-button"
+        onClick={() => void window.lookout.toggleMaximizeWindow()}
+        title="Maximize"
+        type="button"
+      >
+        <Square size={11} />
+      </button>
+      <button
+        className="window-control-button window-control-button--close"
+        onClick={() => void window.lookout.closeWindow()}
+        title="Close"
+        type="button"
+      >
+        <X size={14} />
+      </button>
     </div>
   );
 }

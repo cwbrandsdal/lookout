@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Minus, MoreHorizontal, Pin, Plus, Search, Settings2, Square, X } from 'lucide-react';
+import { MoreHorizontal, Pin, Plus, Search, Settings2, X } from 'lucide-react';
 
 import lookoutLogo from '../assets/lookout-app-icon.png';
 import type { ProjectSpace } from '../types/app';
@@ -216,18 +216,6 @@ export function TabStrip({
         <button className="tab-strip__create" onClick={onCreate} type="button">
           <Plus size={14} />
           <span>New project space</span>
-        </button>
-      </div>
-
-      <div className="window-controls no-drag">
-        <button className="window-control-button" onClick={() => void window.lookout.minimizeWindow()} type="button">
-          <Minus size={14} />
-        </button>
-        <button className="window-control-button" onClick={() => void window.lookout.toggleMaximizeWindow()} type="button">
-          <Square size={11} />
-        </button>
-        <button className="window-control-button window-control-button--close" onClick={() => void window.lookout.closeWindow()} type="button">
-          <X size={14} />
         </button>
       </div>
 
