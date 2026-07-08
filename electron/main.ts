@@ -47,7 +47,7 @@ function createMainWindow(windowState: WindowStateSnapshot): BrowserWindow {
     y: windowState.y,
     minWidth: 1200,
     minHeight: 760,
-    backgroundColor: '#090d13',
+    backgroundColor: '#0b0d11',
     autoHideMenuBar: true,
     icon: resolveWindowIconPath(),
     title: 'Lookout',

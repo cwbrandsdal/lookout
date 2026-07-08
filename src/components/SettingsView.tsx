@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, MonitorCog } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useAppStore } from '../store/useAppStore';
@@ -9,6 +9,10 @@ const DEFAULT_UPDATE_STATE: AppUpdateState = {
   phase: 'unsupported',
   currentVersion: '0.0.0',
 };
+
+const TERMINAL_FONT_FALLBACK = '"Cascadia Code", "JetBrains Mono", Consolas, monospace';
+
+const PREVIEW_SAMPLE = 'PS D:\\GitHub\\mtn\\lookout> git status --short\n M src/index.css  ?? src/components/';
 
 export function SettingsView() {
   const { settings, updateSettings, setView, activeSpaceId } = useAppStore(
@@ -90,177 +94,213 @@ export function SettingsView() {
   }, [availableFonts, settings.terminalFontFace]);
 
   return (
-    <section className="settings-view">
-      <div className="settings-panel glass-card">
-        <div className="settings-panel__header">
-          <div>
-            <span className="eyebrow">Settings</span>
-            <h1>App settings</h1>
-            <p>Manage updates and terminal appearance.</p>
+    <section className="page-view">
+      <div className="page page--narrow">
+        <header className="page__bar">
+          <div className="page__bar-copy">
+            <h1>Settings</h1>
+            <p className="page__bar-meta">Updates, terminal appearance, and sidebar behavior</p>
           </div>
-          <button
-            className="button button--ghost button--compact"
-            onClick={() => setView(activeSpaceId ? 'workspace' : 'configurator')}
-            type="button"
-          >
-            <ArrowLeft size={14} />
-            Back
-          </button>
-        </div>
-
-        <section className="settings-update">
-          <div className="settings-update__copy">
-            <span className="eyebrow">Updates</span>
-            <strong>
-              Lookout {updateState.currentVersion}
-              {updateState.availableVersion ? ` -> ${updateState.availableVersion}` : ''}
-            </strong>
-            <p>{describeUpdateState(updateState)}</p>
-          </div>
-
-          <div className="settings-update__actions">
+          <div className="page__bar-actions no-drag">
             <button
-              className="button button--secondary button--compact"
-              disabled={updateState.phase === 'checking' || updateState.phase === 'downloading'}
-              onClick={() => void window.lookout.checkForAppUpdates()}
+              className="button button--ghost"
+              onClick={() => setView(activeSpaceId ? 'workspace' : 'configurator')}
               type="button"
             >
-              Check for updates
+              <ArrowLeft size={14} />
+              Back
             </button>
-            {updateState.phase === 'available' ? (
-              <button className="button button--primary button--compact" onClick={() => void window.lookout.downloadAppUpdate()} type="button">
-                Download update
-              </button>
-            ) : null}
-            {updateState.phase === 'downloaded' ? (
-              <button className="button button--primary button--compact" onClick={() => void window.lookout.installAppUpdate()} type="button">
-                Restart to install
-              </button>
-            ) : null}
           </div>
+        </header>
+
+        <section className="card">
+          <div className="card__header">
+            <h2>Updates</h2>
+            <p>Delivered through GitHub Releases</p>
+          </div>
+
+          <div className="settings-version">
+            <div className="settings-version__copy">
+              <strong>
+                Lookout {updateState.currentVersion}
+                {updateState.availableVersion ? ` → ${updateState.availableVersion}` : ''}
+              </strong>
+              <p>{describeUpdateState(updateState)}</p>
+            </div>
+
+            <div className="settings-version__actions">
+              <button
+                className="button button--compact"
+                disabled={updateState.phase === 'checking' || updateState.phase === 'downloading'}
+                onClick={() => void window.lookout.checkForAppUpdates()}
+                type="button"
+              >
+                Check for updates
+              </button>
+              {updateState.phase === 'available' ? (
+                <button
+                  className="button button--primary button--compact"
+                  onClick={() => void window.lookout.downloadAppUpdate()}
+                  type="button"
+                >
+                  Download update
+                </button>
+              ) : null}
+              {updateState.phase === 'downloaded' ? (
+                <button
+                  className="button button--primary button--compact"
+                  onClick={() => void window.lookout.installAppUpdate()}
+                  type="button"
+                >
+                  Restart to install
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {updateState.phase === 'downloading' ? (
+            <>
+              <div className="progress">
+                <span style={{ width: `${Math.max(0, Math.min(100, updateState.percent ?? 0))}%` }} />
+              </div>
+              <p className="muted-copy">
+                Downloading {formatPercent(updateState.percent)}
+                {updateState.bytesPerSecond ? ` at ${formatBytes(updateState.bytesPerSecond)}/s` : ''}
+              </p>
+            </>
+          ) : null}
+
+          {updateState.releaseNotes ? <pre className="release-notes">{updateState.releaseNotes}</pre> : null}
         </section>
 
-        {updateState.phase === 'downloading' ? (
-          <div className="settings-update__progress">
-            <div className="settings-update__progress-bar">
-              <span style={{ width: `${Math.max(0, Math.min(100, updateState.percent ?? 0))}%` }} />
-            </div>
-            <p>
-              Downloading {formatPercent(updateState.percent)}{updateState.bytesPerSecond ? ` at ${formatBytes(updateState.bytesPerSecond)}/s` : ''}
+        <section className="card">
+          <div className="card__header">
+            <h2>Terminal</h2>
+            <p>Applies to new and existing panes</p>
+          </div>
+
+          <div className="field-row">
+            <label className="field">
+              <span className="field__label">Installed terminal font</span>
+              <select
+                className="field__input"
+                disabled={fontStatus === 'loading' || !fontOptions.length}
+                onChange={(event) => updateSettings({ terminalFontFace: event.target.value })}
+                value={settings.terminalFontFace}
+              >
+                {!fontOptions.length ? (
+                  <option value={settings.terminalFontFace}>
+                    {fontStatus === 'loading' ? 'Loading fonts...' : 'No fonts found'}
+                  </option>
+                ) : null}
+                {fontOptions.map((font) => (
+                  <option key={font} value={font}>
+                    {font}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span className="field__label">Manual font face override</span>
+              <input
+                className="field__input"
+                onChange={(event) => updateSettings({ terminalFontFace: event.target.value })}
+                placeholder="MesloLGL Nerd Font Propo"
+                value={settings.terminalFontFace}
+              />
+            </label>
+          </div>
+
+          <div className="field-row field-row--3">
+            <label className="field">
+              <span className="field__label">Font size</span>
+              <input
+                className="field__input"
+                max={24}
+                min={8}
+                onChange={(event) => updateSettings({ terminalFontSize: Number(event.target.value) || 13 })}
+                type="number"
+                value={settings.terminalFontSize}
+              />
+            </label>
+
+            <label className="field">
+              <span className="field__label">Line height</span>
+              <input
+                className="field__input"
+                max={1.4}
+                min={0.8}
+                onChange={(event) =>
+                  updateSettings({
+                    terminalLineHeight: Number.parseFloat(event.target.value) || 1,
+                  })
+                }
+                step={0.01}
+                type="number"
+                value={settings.terminalLineHeight}
+              />
+            </label>
+
+            <label className="field">
+              <span className="field__label">Letter spacing</span>
+              <input
+                className="field__input"
+                max={2}
+                min={-1}
+                onChange={(event) =>
+                  updateSettings({
+                    terminalLetterSpacing: Number.parseFloat(event.target.value) || 0,
+                  })
+                }
+                step={0.1}
+                type="number"
+                value={settings.terminalLetterSpacing}
+              />
+            </label>
+          </div>
+
+          <div className="font-preview">
+            <span
+              className="font-preview__sample"
+              style={{
+                fontFamily: `"${settings.terminalFontFace}", ${TERMINAL_FONT_FALLBACK}`,
+                fontSize: `${settings.terminalFontSize}px`,
+                letterSpacing: `${settings.terminalLetterSpacing}px`,
+                lineHeight: settings.terminalLineHeight * 1.2,
+              }}
+            >
+              {PREVIEW_SAMPLE}
+            </span>
+            <p className="font-preview__caption">
+              {settings.terminalFontFace} · {settings.terminalFontSize}px
             </p>
           </div>
-        ) : null}
 
-        {updateState.releaseNotes ? (
-          <div className="settings-update__notes glass-card">
-            <span className="eyebrow">Release Notes</span>
-            <pre>{updateState.releaseNotes}</pre>
+          <p className="muted-copy">
+            {fontStatus === 'loading'
+              ? 'Loading installed fonts from Windows...'
+              : fontStatus === 'error'
+                ? 'Installed fonts could not be read. You can still type the font face manually.'
+                : `${availableFonts.length} installed font faces available in the dropdown.`}
+          </p>
+        </section>
+
+        <section className="card">
+          <div className="card__header">
+            <h2>Sidebar</h2>
+            <p>Project space tabs on the left rail</p>
           </div>
-        ) : null}
 
-        <div className="settings-grid">
-          <label className="field">
-            <span className="field__label">Installed terminal font</span>
-            <select
-              className="field__input"
-              disabled={fontStatus === 'loading' || !fontOptions.length}
-              onChange={(event) => updateSettings({ terminalFontFace: event.target.value })}
-              value={settings.terminalFontFace}
-            >
-              {!fontOptions.length ? (
-                <option value={settings.terminalFontFace}>{fontStatus === 'loading' ? 'Loading fonts...' : 'No fonts found'}</option>
-              ) : null}
-              {fontOptions.map((font) => (
-                <option key={font} value={font}>
-                  {font}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span className="field__label">Manual font face override</span>
+          <label className="toggle">
             <input
-              className="field__input"
-              onChange={(event) => updateSettings({ terminalFontFace: event.target.value })}
-              placeholder="MesloLGL Nerd Font Propo"
-              value={settings.terminalFontFace}
+              checked={settings.showPinnedTabsOnly}
+              onChange={(event) => updateSettings({ showPinnedTabsOnly: event.target.checked })}
+              type="checkbox"
             />
+            <span>Show only pinned spaces in the sidebar, with the rest under More</span>
           </label>
-
-          <label className="field">
-            <span className="field__label">Terminal font size</span>
-            <input
-              className="field__input"
-              max={24}
-              min={8}
-              onChange={(event) => updateSettings({ terminalFontSize: Number(event.target.value) || 13 })}
-              type="number"
-              value={settings.terminalFontSize}
-            />
-          </label>
-
-          <label className="field">
-            <span className="field__label">Line height</span>
-            <input
-              className="field__input"
-              max={1.4}
-              min={0.8}
-              onChange={(event) =>
-                updateSettings({
-                  terminalLineHeight: Number.parseFloat(event.target.value) || 1,
-                })
-              }
-              step={0.01}
-              type="number"
-              value={settings.terminalLineHeight}
-            />
-          </label>
-
-          <label className="field">
-            <span className="field__label">Letter spacing</span>
-            <input
-              className="field__input"
-              max={2}
-              min={-1}
-              onChange={(event) =>
-                updateSettings({
-                  terminalLetterSpacing: Number.parseFloat(event.target.value) || 0,
-                })
-              }
-              step={0.1}
-              type="number"
-              value={settings.terminalLetterSpacing}
-            />
-          </label>
-        </div>
-
-        <label className="toggle">
-          <input
-            checked={settings.showPinnedTabsOnly}
-            onChange={(event) => updateSettings({ showPinnedTabsOnly: event.target.checked })}
-            type="checkbox"
-          />
-          <span>Show only pinned spaces in the top tab bar, with the rest under More.</span>
-        </label>
-
-        <p className="muted-copy">
-          {fontStatus === 'loading'
-            ? 'Loading installed fonts from Windows...'
-            : fontStatus === 'error'
-              ? 'Installed fonts could not be read. You can still type the font face manually.'
-              : `${availableFonts.length} installed font faces available in the dropdown.`}
-        </p>
-
-        <div className="settings-preview">
-          <div className="settings-preview__icon">
-            <MonitorCog size={18} />
-          </div>
-          <div>
-            <strong>{settings.terminalFontFace}</strong>
-            <p>Applied to new and existing terminal panes in the current session.</p>
-          </div>
-        </div>
+        </section>
       </div>
     </section>
   );

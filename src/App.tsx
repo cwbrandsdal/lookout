@@ -160,9 +160,12 @@ function AppContent() {
   }, [bridgeAvailable]);
 
   useEffect(() => {
+    // Capture phase so the shortcut works everywhere, including inside xterm
+    // panes, which stop propagation of keydown events they handle.
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
+        event.stopPropagation();
         setSpaceSwitcherOpen(true);
       }
 
@@ -171,8 +174,8 @@ function AppContent() {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, []);
 
   if (bridgeError) {
@@ -189,8 +192,6 @@ function AppContent() {
 
   return (
     <div className="app-shell">
-      <div className="app-shell__backdrop" />
-      <div className="window-drag-region" aria-hidden="true" />
       <div className="app-shell__content">
         <TabStrip
           activeSpaceId={activeSpace?.id ?? null}
@@ -357,51 +358,42 @@ function SpaceSwitcher({
         }
       }}
     >
-      <section className="space-switcher glass-card">
-        <div className="space-switcher__header">
-          <div className="space-switcher__title">
-            <Search size={16} />
-            <div>
-              <span className="eyebrow">Quick Switch</span>
-              <strong>Jump to any space</strong>
-            </div>
-          </div>
-          <button className="button button--ghost button--compact" onClick={onClose} type="button">
-            Esc
-          </button>
+      <section className="space-switcher">
+        <div className="space-switcher__search">
+          <Search size={15} />
+          <input
+            autoFocus
+            className="space-switcher__input"
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSelectedIndex(0);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setSelectedIndex((current) => Math.min(current + 1, Math.max(filteredSpaces.length - 1, 0)));
+              }
+
+              if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setSelectedIndex((current) => Math.max(current - 1, 0));
+              }
+
+              if (event.key === 'Enter' && filteredSpaces[boundedSelectedIndex]) {
+                event.preventDefault();
+                onSelect(filteredSpaces[boundedSelectedIndex]);
+              }
+
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                onClose();
+              }
+            }}
+            placeholder="Jump to a project space by name or path"
+            value={query}
+          />
+          <kbd>Esc</kbd>
         </div>
-
-        <input
-          autoFocus
-          className="space-switcher__input"
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setSelectedIndex(0);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown') {
-              event.preventDefault();
-              setSelectedIndex((current) => Math.min(current + 1, Math.max(filteredSpaces.length - 1, 0)));
-            }
-
-            if (event.key === 'ArrowUp') {
-              event.preventDefault();
-              setSelectedIndex((current) => Math.max(current - 1, 0));
-            }
-
-            if (event.key === 'Enter' && filteredSpaces[boundedSelectedIndex]) {
-              event.preventDefault();
-              onSelect(filteredSpaces[boundedSelectedIndex]);
-            }
-
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              onClose();
-            }
-          }}
-          placeholder="Search by project name or path"
-          value={query}
-        />
 
         <div className="space-switcher__list">
           {filteredSpaces.length ? (
@@ -424,7 +416,7 @@ function SpaceSwitcher({
                   <div className="space-switcher__item-meta">
                     {space.pinned ? <span className="space-switcher__pill">Pinned</span> : null}
                     <span className="space-switcher__pill">{space.isOpen ? 'Open' : 'Saved'}</span>
-                    {isActive ? <span className="space-switcher__pill">Active</span> : null}
+                    {isActive ? <span className="space-switcher__pill space-switcher__pill--accent">Active</span> : null}
                   </div>
                 </button>
               );
@@ -449,8 +441,7 @@ function DiagnosticScreen({
 }) {
   return (
     <div className="diagnostic-shell">
-      <div className="app-shell__backdrop" />
-      <section className="diagnostic-card glass-card">
+      <section className="diagnostic-card">
         <div className="diagnostic-card__icon">{loading ? <RefreshCw className="spin" size={26} /> : <FolderKanban size={26} />}</div>
         <div className="diagnostic-card__copy">
           <span className="eyebrow">Lookout</span>

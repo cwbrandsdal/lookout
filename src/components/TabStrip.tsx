@@ -82,18 +82,21 @@ export function TabStrip({
 
   return (
     <header className="tab-strip">
-      <div className="brand-mark">
-        <img alt="" aria-hidden="true" className="brand-mark__image" src={lookoutLogo} />
-      </div>
+      <div className="tab-strip__header">
+        <div className="brand-mark">
+          <img alt="" aria-hidden="true" className="brand-mark__image" src={lookoutLogo} />
+        </div>
+        <span className="brand-wordmark">Lookout</span>
 
-      <div className="tab-strip__controls no-drag">
-        <button className="tab-chip__icon tab-strip__control" onClick={onOpenSwitcher} title="Quick switch (Ctrl+K)" type="button">
-          <Search size={14} />
-        </button>
+        <div className="tab-strip__controls no-drag">
+          <button className="icon-button" onClick={onOpenSwitcher} title="Quick switch (Ctrl+K)" type="button">
+            <Search size={14} />
+          </button>
 
-        <button className="tab-chip__icon tab-strip__control" onClick={onOpenSettings} title="Settings" type="button">
-          <Settings2 size={14} />
-        </button>
+          <button className="icon-button" onClick={onOpenSettings} title="Settings" type="button">
+            <Settings2 size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="tab-strip__track">
@@ -147,6 +150,7 @@ export function TabStrip({
                   <>
                     <span className="tab-chip__title-row">
                       <span className="tab-chip__label">{space.displayName}</span>
+                      {space.pinned ? <Pin className="tab-chip__pin" size={10} /> : null}
                       <span className="tab-chip__badge">{space.paneDefinitions.length}</span>
                     </span>
                     <span className="tab-chip__path">{space.rootPath}</span>
@@ -206,14 +210,14 @@ export function TabStrip({
 
           </div>
         ) : null}
-
-        <button className="tab-chip tab-chip--create no-drag" onClick={onCreate} type="button">
-          <Plus size={16} />
-          <span>Project Space</span>
-        </button>
       </div>
 
-      <div className="tab-strip__drag-fill" />
+      <div className="tab-strip__footer no-drag">
+        <button className="tab-strip__create" onClick={onCreate} type="button">
+          <Plus size={14} />
+          <span>New project space</span>
+        </button>
+      </div>
 
       <div className="window-controls no-drag">
         <button className="window-control-button" onClick={() => void window.lookout.minimizeWindow()} type="button">
@@ -231,7 +235,7 @@ export function TabStrip({
         ? createPortal(
             <div className="tab-overflow-overlay no-drag" onMouseDown={() => setOverflowOpen(false)}>
               <div
-                className="tab-overflow__menu glass-card"
+                className="tab-overflow__menu"
                 onMouseDown={(event) => event.stopPropagation()}
                 style={overflowMenuStyle}
               >

@@ -25,7 +25,7 @@ interface TerminalEntry {
 const TERMINAL_THEME = {
   background: '#0b1118',
   foreground: '#d8e0ed',
-  cursor: '#5a9dff',
+  cursor: '#f0883e',
   black: '#0b1118',
   brightBlack: '#67748a',
   red: '#ef728f',

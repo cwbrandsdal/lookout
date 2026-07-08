@@ -352,7 +352,7 @@ export function TerminalPane({
         </div>
 
         <div className="terminal-pane__controls">
-          <span className="role-tag" style={{ borderColor: role.accent, color: role.accent }}>
+          <span className="role-tag" style={{ color: role.accent }}>
             {role.displayName}
           </span>
           <span className={`status-pill status-pill--${isSetupMode ? 'setup' : runtime.status}`}>{isSetupMode ? 'setup' : runtime.status}</span>
@@ -391,10 +391,10 @@ export function TerminalPane({
           {!isSetupMode ? (
             <>
               <button className="icon-button" draggable={false} onClick={() => void restartWithCurrentSize()} type="button">
-                <RefreshCcw size={14} />
+                <RefreshCcw size={13} />
               </button>
               <button className="icon-button" draggable={false} onClick={() => clearPaneBuffer(pane.id)} type="button">
-                <Trash2 size={14} />
+                <Trash2 size={13} />
               </button>
             </>
           ) : null}
@@ -404,10 +404,10 @@ export function TerminalPane({
             onClick={() => void navigator.clipboard.writeText(effectivePath)}
             type="button"
           >
-            <Copy size={14} />
+            <Copy size={13} />
           </button>
           <button className="icon-button" draggable={false} onClick={() => void window.lookout.openPath(effectivePath)} type="button">
-            <FolderOpen size={14} />
+            <FolderOpen size={13} />
           </button>
           <button
             aria-label="Open in VS Code"
@@ -417,7 +417,7 @@ export function TerminalPane({
             title="Open in VS Code"
             type="button"
           >
-            <SquareCode size={14} />
+            <SquareCode size={13} />
           </button>
           {!isSetupMode && runtime.sessionId ? (
             <button
@@ -426,7 +426,7 @@ export function TerminalPane({
               onClick={() => void stopPane(pane.id)}
               type="button"
             >
-              <Square size={14} />
+              <Square size={13} />
             </button>
           ) : !isSetupMode ? (
             <button
@@ -435,7 +435,7 @@ export function TerminalPane({
               onClick={() => void launchWithCurrentSize()}
               type="button"
             >
-              <Play size={14} />
+              <Play size={13} />
             </button>
           ) : null}
         </div>

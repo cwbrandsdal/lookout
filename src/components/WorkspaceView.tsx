@@ -66,11 +66,11 @@ export function WorkspaceView({ space }: WorkspaceViewProps) {
           <span>{space.displayName}</span>
           <span>{space.rootPath}</span>
         </div>
-        <div className="workspace__toolbar-actions">
+        <div className="workspace__toolbar-actions no-drag">
           <span className="workspace__toolbar-meta">
             {maximizedPane
-              ? `Focused pane | ${maximizedPane.title || 'Terminal'}`
-              : `${space.layoutTree ? 'Custom split layout' : layout.name} | ${space.paneDefinitions.length} panes`}
+              ? `Focused pane · ${maximizedPane.title || 'Terminal'}`
+              : `${space.layoutTree ? 'Custom split' : layout.name} · ${space.paneDefinitions.length} panes`}
           </span>
           {maximizedPane ? (
             <button className="button button--ghost button--compact" onClick={() => clearPaneMaximized(space.id)} type="button">
