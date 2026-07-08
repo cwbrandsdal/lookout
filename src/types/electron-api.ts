@@ -46,6 +46,7 @@ export interface AppUpdateState {
 }
 
 export interface LookoutApi {
+  getPathForFile: (file: File) => string;
   loadAppState: () => Promise<LoadStateResponse>;
   saveAppState: (state: PersistedAppState) => Promise<void>;
   getAppUpdateState: () => Promise<AppUpdateState>;

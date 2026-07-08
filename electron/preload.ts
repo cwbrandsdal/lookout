@@ -1,8 +1,9 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 import type { LookoutApi } from '../src/types/electron-api';
 
 const api: LookoutApi = {
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   loadAppState: () => ipcRenderer.invoke('lookout:load-state'),
   saveAppState: (state) => ipcRenderer.invoke('lookout:save-state', state),
   getAppUpdateState: () => ipcRenderer.invoke('lookout:get-app-update-state'),

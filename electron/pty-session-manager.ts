@@ -12,10 +12,23 @@ import type { TerminalEvent, TerminalLaunchRequest, TerminalLaunchResponse } fro
 const execFileAsync = promisify(execFile);
 const TERMINAL_EVENT_CHANNEL = 'lookout:terminal-event';
 
+// Coalesce PTY output before crossing the IPC boundary: heavy TUI redraws emit
+// thousands of tiny chunks per second, and one renderer message per chunk janks.
+const OUTPUT_FLUSH_INTERVAL_MS = 5;
+const OUTPUT_FLUSH_THRESHOLD = 262_144;
+
+// ConPTY's input buffer can drop data on very large single writes (big pastes),
+// so anything above one chunk is queued and paced.
+const INPUT_CHUNK_SIZE = 4096;
+
 interface SessionRecord {
   paneId: string;
   projectSpaceId: string;
   ptyProcess: IPty;
+  pendingOutput: string;
+  outputFlushTimer: NodeJS.Timeout | null;
+  inputQueue: string[];
+  drainingInput: boolean;
 }
 
 export class PtySessionManager {
@@ -39,32 +52,41 @@ export class PtySessionManager {
         COLORTERM: 'truecolor',
       };
 
-      const ptyProcess = pty.spawn(shellPath, shellArgs, {
+      const spawnOptions = {
         cols: request.cols ?? 120,
         rows: request.rows ?? 34,
         cwd,
         env,
         name: 'xterm-256color',
         useConpty: true,
-      });
+      };
 
-      this.sessions.set(sessionId, {
+      let ptyProcess: IPty;
+      try {
+        // Prefer the ConPTY bundled with node-pty (from the Windows Terminal
+        // project) over the in-box Windows one; fall back if it fails to load.
+        ptyProcess = pty.spawn(shellPath, shellArgs, { ...spawnOptions, useConptyDll: true });
+      } catch {
+        ptyProcess = pty.spawn(shellPath, shellArgs, spawnOptions);
+      }
+
+      const record: SessionRecord = {
         paneId: request.paneId,
         projectSpaceId: request.projectSpaceId,
         ptyProcess,
-      });
+        pendingOutput: '',
+        outputFlushTimer: null,
+        inputQueue: [],
+        drainingInput: false,
+      };
+      this.sessions.set(sessionId, record);
 
       ptyProcess.onData((data) => {
-        this.emit({
-          type: 'data',
-          sessionId,
-          paneId: request.paneId,
-          projectSpaceId: request.projectSpaceId,
-          data,
-        });
+        this.queueOutput(sessionId, record, data);
       });
 
       ptyProcess.onExit(({ exitCode, signal }) => {
+        this.flushOutput(sessionId, record);
         this.sessions.delete(sessionId);
         this.emit({
           type: 'exit',
@@ -106,7 +128,7 @@ export class PtySessionManager {
       return;
     }
 
-    session.ptyProcess.kill();
+    this.teardownSession(session);
     this.sessions.delete(sessionId);
   }
 
@@ -114,7 +136,7 @@ export class PtySessionManager {
     const paneIdsSet = new Set(paneIds);
     for (const [sessionId, session] of this.sessions.entries()) {
       if (paneIdsSet.has(session.paneId)) {
-        session.ptyProcess.kill();
+        this.teardownSession(session);
         this.sessions.delete(sessionId);
       }
     }
@@ -122,7 +144,20 @@ export class PtySessionManager {
 
   write(sessionId: string, data: string): void {
     const session = this.sessions.get(sessionId);
-    session?.ptyProcess.write(data);
+    if (!session) {
+      return;
+    }
+
+    if (!session.inputQueue.length && data.length <= INPUT_CHUNK_SIZE) {
+      session.ptyProcess.write(data);
+      return;
+    }
+
+    for (let offset = 0; offset < data.length; offset += INPUT_CHUNK_SIZE) {
+      session.inputQueue.push(data.slice(offset, offset + INPUT_CHUNK_SIZE));
+    }
+
+    this.drainInput(sessionId, session);
   }
 
   resize(sessionId: string, cols: number, rows: number): void {
@@ -137,10 +172,89 @@ export class PtySessionManager {
 
   dispose(): void {
     for (const session of this.sessions.values()) {
-      session.ptyProcess.kill();
+      this.teardownSession(session);
     }
 
     this.sessions.clear();
+  }
+
+  private teardownSession(session: SessionRecord): void {
+    if (session.outputFlushTimer) {
+      clearTimeout(session.outputFlushTimer);
+      session.outputFlushTimer = null;
+    }
+
+    session.inputQueue.length = 0;
+    session.ptyProcess.kill();
+  }
+
+  private queueOutput(sessionId: string, record: SessionRecord, data: string): void {
+    record.pendingOutput += data;
+
+    if (record.pendingOutput.length >= OUTPUT_FLUSH_THRESHOLD) {
+      this.flushOutput(sessionId, record);
+      return;
+    }
+
+    if (!record.outputFlushTimer) {
+      record.outputFlushTimer = setTimeout(() => {
+        this.flushOutput(sessionId, record);
+      }, OUTPUT_FLUSH_INTERVAL_MS);
+    }
+  }
+
+  private flushOutput(sessionId: string, record: SessionRecord): void {
+    if (record.outputFlushTimer) {
+      clearTimeout(record.outputFlushTimer);
+      record.outputFlushTimer = null;
+    }
+
+    if (!record.pendingOutput) {
+      return;
+    }
+
+    const data = record.pendingOutput;
+    record.pendingOutput = '';
+    this.emit({
+      type: 'data',
+      sessionId,
+      paneId: record.paneId,
+      projectSpaceId: record.projectSpaceId,
+      data,
+    });
+  }
+
+  private drainInput(sessionId: string, session: SessionRecord): void {
+    if (session.drainingInput) {
+      return;
+    }
+
+    session.drainingInput = true;
+
+    const writeNext = () => {
+      if (this.sessions.get(sessionId) !== session) {
+        session.drainingInput = false;
+        return;
+      }
+
+      const chunk = session.inputQueue.shift();
+      if (chunk === undefined) {
+        session.drainingInput = false;
+        return;
+      }
+
+      try {
+        session.ptyProcess.write(chunk);
+      } catch {
+        session.inputQueue.length = 0;
+        session.drainingInput = false;
+        return;
+      }
+
+      setTimeout(writeNext, 1);
+    };
+
+    writeNext();
   }
 
   private emit(event: TerminalEvent): void {

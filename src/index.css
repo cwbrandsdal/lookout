@@ -1585,6 +1585,11 @@ select.field__input option {
   padding: 0;
 }
 
+.terminal-host {
+  height: 100%;
+  width: 100%;
+}
+
 .terminal-pane__overlay {
   align-items: center;
   background: linear-gradient(180deg, rgba(7, 10, 16, 0.58), rgba(7, 10, 16, 0.78));

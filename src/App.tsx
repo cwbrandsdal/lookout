@@ -7,6 +7,7 @@ import { SettingsView } from './components/SettingsView';
 import { WorkspaceConfigurator } from './components/WorkspaceConfigurator';
 import { WorkspaceView } from './components/WorkspaceView';
 import { useAppStore } from './store/useAppStore';
+import { syncTerminalRegistry } from './services/terminal-registry';
 import type { AppUpdateState } from './types/electron-api';
 import type { ProjectSpace } from './types/app';
 
@@ -104,6 +105,17 @@ function AppContent() {
     restoredSessionsRef.current = true;
     void restoreOpenSpaces();
   }, [bridgeAvailable, hydrated, restoreOpenSpaces]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    const validPaneIds = new Set(
+      projectSpaces.filter((space) => space.isOpen).flatMap((space) => space.paneDefinitions.map((pane) => pane.id)),
+    );
+    syncTerminalRegistry(validPaneIds);
+  }, [hydrated, projectSpaces]);
 
   useEffect(() => {
     if (!hydrated || !bridgeAvailable) {

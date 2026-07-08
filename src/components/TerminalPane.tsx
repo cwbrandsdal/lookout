@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ClipboardEvent as ReactClipboardEvent } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, DragEvent as ReactDragEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Columns2,
@@ -16,12 +16,18 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { FitAddon } from '@xterm/addon-fit';
-import { Terminal } from '@xterm/xterm';
+import type { FitAddon } from '@xterm/addon-fit';
+import type { Terminal } from '@xterm/xterm';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useAppStore } from '../store/useAppStore';
-import { getTerminalBuffer, subscribeToTerminalStream } from '../services/terminal-stream';
+import {
+  acquireTerminal,
+  attachTerminal,
+  detachTerminal,
+  fitTerminal,
+  setTerminalSessionId,
+} from '../services/terminal-registry';
 import {
   getDefaultStartupCommandForRole,
   getRoleDefinition,
@@ -59,27 +65,7 @@ const NO_GIT_INFO: GitInfoResponse = {
   ok: false,
 };
 
-const TERMINAL_THEME = {
-  background: '#0b1118',
-  foreground: '#d8e0ed',
-  cursor: '#5a9dff',
-  black: '#0b1118',
-  brightBlack: '#67748a',
-  red: '#ef728f',
-  brightRed: '#f48ca3',
-  green: '#72d7ac',
-  brightGreen: '#95e6c1',
-  yellow: '#edbe67',
-  brightYellow: '#f4ce8a',
-  blue: '#5a9dff',
-  brightBlue: '#7fb3ff',
-  magenta: '#9588ff',
-  brightMagenta: '#b4adff',
-  cyan: '#5bd3d7',
-  brightCyan: '#80e2e5',
-  white: '#d8e0ed',
-  brightWhite: '#f1f5fb',
-};
+const TERMINAL_FONT_FALLBACK = '"Cascadia Code", "JetBrains Mono", Consolas, monospace';
 
 export function TerminalPane({
   space,
@@ -118,31 +104,10 @@ export function TerminalPane({
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | undefined>(runtime.sessionId);
-  const recentPasteWriteRef = useRef<{ text: string; at: number } | null>(null);
   const [gitInfo, setGitInfo] = useState<GitInfoResponse>(NO_GIT_INFO);
   const isDraggable = !isMaximized && Boolean(onDragStart || onDragEnd);
   const isSetupMode = pane.needsSetup;
   const displayedGitInfo = isSetupMode ? NO_GIT_INFO : gitInfo;
-
-  async function writeClipboardText(text: string) {
-    const sessionId = sessionIdRef.current;
-    if (!sessionId || !text) {
-      return;
-    }
-
-    const recentPaste = recentPasteWriteRef.current;
-    if (recentPaste && recentPaste.text === text && Date.now() - recentPaste.at < 250) {
-      return;
-    }
-
-    recentPasteWriteRef.current = {
-      text,
-      at: Date.now(),
-    };
-
-    await window.lookout.writeTerminalData(sessionId, text);
-    terminalRef.current?.focus();
-  }
 
   async function launchWithCurrentSize(clearBuffer = true) {
     if (isSetupMode) {
@@ -183,171 +148,71 @@ export function TerminalPane({
 
   useEffect(() => {
     sessionIdRef.current = runtime.sessionId;
-  }, [runtime.sessionId]);
+    setTerminalSessionId(pane.id, runtime.sessionId);
+  }, [pane.id, runtime.sessionId]);
 
   useEffect(() => {
-    if (isSetupMode || !containerRef.current || terminalRef.current) {
+    if (isSetupMode || !containerRef.current) {
       return;
     }
 
-    const terminal = new Terminal({
-      allowTransparency: true,
-      convertEol: true,
-      cursorBlink: false,
-      cursorInactiveStyle: 'none',
-      cursorStyle: 'bar',
-      fontFamily: '"Cascadia Code", "JetBrains Mono", Consolas, monospace',
-      fontSize: 13,
-      letterSpacing: 0,
-      lineHeight: 1,
-      scrollback: 5000,
-      theme: TERMINAL_THEME,
-    });
-    const fitAddon = new FitAddon();
-    terminal.loadAddon(fitAddon);
-    terminal.open(containerRef.current);
-    fitAddon.fit();
-    terminal.attachCustomKeyEventHandler((event) => {
-      const isCopyShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c';
-      const isPasteShortcut =
-        ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') ||
-        (event.shiftKey && event.key === 'Insert');
-      const isShiftInsertPaste = event.shiftKey && event.key === 'Insert';
-
-      if (isCopyShortcut && terminal.hasSelection()) {
-        event.preventDefault();
-        event.stopPropagation();
-        void navigator.clipboard.writeText(terminal.getSelection()).catch(() => {});
-        return false;
-      }
-
-      if (isPasteShortcut && event.type === 'keydown') {
-        event.preventDefault();
-        event.stopPropagation();
-        void navigator.clipboard
-          .readText()
-          .then((text) => {
-            if (!text) {
-              return;
-            }
-
-            return writeClipboardText(text);
-          })
-          .catch(() => {});
-        return false;
-      }
-
-      if (isShiftInsertPaste) {
-        event.preventDefault();
-        event.stopPropagation();
-        return false;
-      }
-
-      return true;
+    const settings = useAppStore.getState().settings;
+    const { terminal, fitAddon } = acquireTerminal(pane.id, {
+      fontFamily: `${settings.terminalFontFace}, ${TERMINAL_FONT_FALLBACK}`,
+      fontSize: settings.terminalFontSize,
+      lineHeight: settings.terminalLineHeight,
+      letterSpacing: settings.terminalLetterSpacing,
     });
 
-    const helperTextarea = containerRef.current.querySelector('textarea');
-    const handleNativePaste = (event: ClipboardEvent) => {
-      const text = event.clipboardData?.getData('text/plain') ?? '';
-      if (!text) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      void writeClipboardText(text);
-    };
-
-    helperTextarea?.addEventListener('paste', handleNativePaste, true);
-
-    const dataDisposable = terminal.onData((data) => {
-      const sessionId = sessionIdRef.current;
-      if (sessionId) {
-        void window.lookout.writeTerminalData(sessionId, data);
-      }
-    });
+    setTerminalSessionId(pane.id, sessionIdRef.current);
+    attachTerminal(pane.id, containerRef.current);
+    terminalRef.current = terminal;
+    fitAddonRef.current = fitAddon;
 
     const resizeObserver = new ResizeObserver(() => {
-      if (!fitAddonRef.current || !terminalRef.current) {
-        return;
-      }
-
-      fitAddonRef.current.fit();
+      fitTerminal(pane.id);
       const sessionId = sessionIdRef.current;
-      if (sessionId) {
+      if (sessionId && terminalRef.current) {
         void window.lookout.resizeTerminalSession(sessionId, terminalRef.current.cols, terminalRef.current.rows);
       }
     });
 
     resizeObserver.observe(containerRef.current);
 
-    terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-
     return () => {
-      helperTextarea?.removeEventListener('paste', handleNativePaste, true);
       resizeObserver.disconnect();
-      dataDisposable.dispose();
-      terminal.dispose();
+      detachTerminal(pane.id);
       terminalRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [isSetupMode]);
-
-  useEffect(() => {
-    if (isSetupMode) {
-      return;
-    }
-
-    const terminal = terminalRef.current;
-    if (!terminal) {
-      return;
-    }
-
-    const initialBuffer = getTerminalBuffer(pane.id);
-    if (initialBuffer) {
-      terminal.reset();
-      terminal.write(initialBuffer);
-    }
-
-    return subscribeToTerminalStream(pane.id, (event) => {
-      if (event.type === 'clear') {
-        terminal.reset();
-        return;
-      }
-
-      terminal.write(event.data);
-    });
   }, [isSetupMode, pane.id]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
-    const fitAddon = fitAddonRef.current;
     if (!terminal) {
       return;
     }
 
-    terminal.options.fontFamily = `${terminalFontFace}, "Cascadia Code", "JetBrains Mono", Consolas, monospace`;
+    terminal.options.fontFamily = `${terminalFontFace}, ${TERMINAL_FONT_FALLBACK}`;
     terminal.options.fontSize = terminalFontSize;
     terminal.options.lineHeight = terminalLineHeight;
     terminal.options.letterSpacing = terminalLetterSpacing;
-    fitAddon?.fit();
+    fitTerminal(pane.id);
 
     if (runtime.sessionId) {
       void window.lookout.resizeTerminalSession(runtime.sessionId, terminal.cols, terminal.rows);
     }
-  }, [runtime.sessionId, terminalFontFace, terminalFontSize, terminalLetterSpacing, terminalLineHeight]);
+  }, [pane.id, runtime.sessionId, terminalFontFace, terminalFontSize, terminalLetterSpacing, terminalLineHeight]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
-    const fitAddon = fitAddonRef.current;
-    if (!terminal || !fitAddon || !runtime.sessionId) {
+    if (!terminal || !runtime.sessionId) {
       return;
     }
 
-    fitAddon.fit();
+    fitTerminal(pane.id);
     void window.lookout.resizeTerminalSession(runtime.sessionId, terminal.cols, terminal.rows);
-  }, [runtime.sessionId]);
+  }, [pane.id, runtime.sessionId]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -418,15 +283,49 @@ export function TerminalPane({
     event.clipboardData.setData('text/plain', selectedText);
   }
 
+  function isFileDrag(event: ReactDragEvent<HTMLElement>) {
+    return Array.from(event.dataTransfer.types).includes('Files');
+  }
+
+  function handleFileDrop(event: ReactDragEvent<HTMLElement>) {
+    const paths = Array.from(event.dataTransfer.files)
+      .map((file) => {
+        try {
+          return window.lookout.getPathForFile(file);
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean);
+
+    if (!paths.length) {
+      return;
+    }
+
+    const terminal = terminalRef.current;
+    terminal?.paste(paths.map((filePath) => (/\s/.test(filePath) ? `"${filePath}"` : filePath)).join(' '));
+    terminal?.focus();
+  }
+
   return (
     <article
       className={`terminal-pane ${isDragging ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isMaximized ? 'is-maximized' : ''}`}
       onDragOver={(event) => {
         event.preventDefault();
+        if (isFileDrag(event)) {
+          event.dataTransfer.dropEffect = 'copy';
+          return;
+        }
+
         onDragOver?.();
       }}
       onDrop={(event) => {
         event.preventDefault();
+        if (isFileDrag(event)) {
+          handleFileDrop(event);
+          return;
+        }
+
         onDrop?.();
       }}
     >
