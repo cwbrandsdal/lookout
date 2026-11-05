@@ -18,12 +18,13 @@ const electronBinary = process.platform === 'win32'
   ? path.join(projectRoot, 'node_modules/electron/dist/electron.exe')
   : path.join(projectRoot, 'node_modules/.bin/electron');
 
+const env = { ...process.env, VITE_DEV_SERVER_URL: devServerUrl };
+// Inherited from editors/agents that are themselves Electron apps; it would make Electron start as Node.
+delete env.ELECTRON_RUN_AS_NODE;
+
 const child = spawn(electronBinary, ['.'], {
   cwd: projectRoot,
-  env: {
-    ...process.env,
-    VITE_DEV_SERVER_URL: devServerUrl,
-  },
+  env,
   stdio: 'inherit',
 });
 

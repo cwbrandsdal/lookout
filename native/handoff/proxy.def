@@ -1,0 +1,4 @@
+LIBRARY LookoutHandoffProxy
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

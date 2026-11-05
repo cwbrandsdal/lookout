@@ -1,508 +1,117 @@
-import { Component, type ErrorInfo, type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Download, FolderKanban, Minus, RefreshCw, Search, Square, X } from 'lucide-react';
+import { Component, useEffect, type ErrorInfo, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
-import { TabStrip } from './components/TabStrip';
-import { SettingsView } from './components/SettingsView';
-import { WorkspaceConfigurator } from './components/WorkspaceConfigurator';
-import { WorkspaceView } from './components/WorkspaceView';
-import { useAppStore } from './store/useAppStore';
-import { syncTerminalRegistry } from './services/terminal-registry';
-import type { AppUpdateState } from './types/electron-api';
-import type { ProjectSpace } from './types/app';
+import lookoutLogo from './assets/lookout-app-icon.png';
+import { Overlays } from './components/overlays/Overlays';
+import { PaneDragLayer } from './components/PaneDragLayer';
+import { PaneGrid } from './components/PaneGrid';
+import { SettingsView } from './components/settings/SettingsView';
+import { Sidebar } from './components/Sidebar';
+import { TopBar } from './components/TopBar';
+import { useApp } from './state/store';
+import { resolveAppTheme } from './terminal/theme';
 
-const DEFAULT_UPDATE_STATE: AppUpdateState = {
-  phase: 'unsupported',
-  currentVersion: '0.0.0',
-};
-
-function App() {
+export default function App() {
   return (
-    <RendererErrorBoundary>
-      <AppContent />
-    </RendererErrorBoundary>
+    <ErrorBoundary>
+      <Shell />
+    </ErrorBoundary>
   );
 }
 
-function AppContent() {
-  const restoredSessionsRef = useRef(false);
-  const [bootError, setBootError] = useState<string | null>(null);
-  const [appUpdateState, setAppUpdateState] = useState<AppUpdateState>(DEFAULT_UPDATE_STATE);
-  const [dismissedUpdateKey, setDismissedUpdateKey] = useState<string | null>(null);
-  const [spaceSwitcherOpen, setSpaceSwitcherOpen] = useState(false);
-  const initialize = useAppStore((state) => state.initialize);
-  const handleTerminalEvent = useAppStore((state) => state.handleTerminalEvent);
-  const restoreOpenSpaces = useAppStore((state) => state.restoreOpenSpaces);
-  const clearWarning = useAppStore((state) => state.clearWarning);
-  const setView = useAppStore((state) => state.setView);
-  const openCreateConfigurator = useAppStore((state) => state.openCreateConfigurator);
-  const activateSpace = useAppStore((state) => state.activateSpace);
-  const reopenSpace = useAppStore((state) => state.reopenSpace);
-  const closeSpace = useAppStore((state) => state.closeSpace);
-  const renameSpace = useAppStore((state) => state.renameSpace);
-  const openEditConfigurator = useAppStore((state) => state.openEditConfigurator);
-  const toggleSpacePinned = useAppStore((state) => state.toggleSpacePinned);
-  const { hydrated, warnings, view, activeSpaceId, settings, roles, presets, projectSpaces } = useAppStore(
+function useThemeAttribute(): void {
+  const appTheme = useApp((state) => state.settings.appTheme);
+  const darkTheme = useApp((state) => state.settings.darkTheme);
+  useEffect(() => {
+    const apply = () => {
+      document.documentElement.dataset.theme = resolveAppTheme(useApp.getState().settings);
+      document.documentElement.dataset.darkTheme = darkTheme;
+    };
+    apply();
+    const query = window.matchMedia('(prefers-color-scheme: light)');
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, [appTheme, darkTheme]);
+}
+
+function Shell() {
+  useThemeAttribute();
+  const { ready, bootError, tabs, activeTabId, settingsOpen, elevated, windowKind, sidebarCollapsed, sidebarWidth } = useApp(
     useShallow((state) => ({
-      hydrated: state.hydrated,
-      warnings: state.bootWarnings,
-      view: state.view,
-      activeSpaceId: state.activeSpaceId,
-      settings: state.settings,
-      roles: state.roles,
-      presets: state.presets,
-      projectSpaces: state.projectSpaces,
+      ready: state.ready,
+      bootError: state.bootError,
+      tabs: state.tabs,
+      activeTabId: state.activeTabId,
+      settingsOpen: state.ui.settingsOpen,
+      elevated: state.elevated,
+      windowKind: state.windowKind,
+      sidebarCollapsed: state.sidebarCollapsed,
+      sidebarWidth: state.sidebarWidth,
     })),
   );
 
-  const bridgeAvailable = typeof window.lookout !== 'undefined';
-  const bridgeError = bridgeAvailable
-    ? null
-    : 'Electron preload bridge is unavailable. The renderer cannot talk to the desktop backend.';
-  const openSpaces = projectSpaces.filter((space) => space.isOpen);
-  const activeSpace = openSpaces.find((space) => space.id === activeSpaceId) ?? openSpaces[0] ?? null;
-  const updateNoticeKey = useMemo(() => {
-    if (appUpdateState.phase === 'available' || appUpdateState.phase === 'downloaded') {
-      return `${appUpdateState.phase}:${appUpdateState.availableVersion ?? 'unknown'}`;
-    }
-
-    return null;
-  }, [appUpdateState.availableVersion, appUpdateState.phase]);
-  const showUpdateBanner = updateNoticeKey !== null && updateNoticeKey !== dismissedUpdateKey;
-
-  useEffect(() => {
-    if (!bridgeAvailable) {
-      return;
-    }
-
-    let mounted = true;
-
-    void window.lookout
-      .loadAppState()
-      .then(({ state, warnings: bootWarnings }) => {
-        if (mounted) {
-          initialize(state, bootWarnings);
-        }
-      })
-      .catch((error) => {
-        if (mounted) {
-          setBootError(error instanceof Error ? error.message : String(error));
-        }
-      });
-
-    const unsubscribe = window.lookout.onTerminalEvent(handleTerminalEvent);
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, [bridgeAvailable, handleTerminalEvent, initialize]);
-
-  useEffect(() => {
-    if (!hydrated || restoredSessionsRef.current || !bridgeAvailable) {
-      return;
-    }
-
-    restoredSessionsRef.current = true;
-    void restoreOpenSpaces();
-  }, [bridgeAvailable, hydrated, restoreOpenSpaces]);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-
-    const validPaneIds = new Set(
-      projectSpaces.filter((space) => space.isOpen).flatMap((space) => space.paneDefinitions.map((pane) => pane.id)),
-    );
-    syncTerminalRegistry(validPaneIds);
-  }, [hydrated, projectSpaces]);
-
-  useEffect(() => {
-    if (!hydrated || !bridgeAvailable) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      void window.lookout.saveAppState({
-        settings,
-        roles,
-        presets,
-        projectSpaces,
-      });
-    }, 240);
-
-    return () => window.clearTimeout(timeout);
-  }, [bridgeAvailable, hydrated, presets, projectSpaces, roles, settings]);
-
-  useEffect(() => {
-    if (!bridgeAvailable) {
-      return;
-    }
-
-    let isMounted = true;
-
-    void window.lookout.getAppUpdateState().then((state) => {
-      if (isMounted) {
-        setAppUpdateState(state);
-      }
-    });
-
-    const unsubscribe = window.lookout.onAppUpdateState((state) => {
-      if (isMounted) {
-        setAppUpdateState(state);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, [bridgeAvailable]);
-
-  useEffect(() => {
-    // Capture phase so the shortcut works everywhere, including inside xterm
-    // panes, which stop propagation of keydown events they handle.
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        event.stopPropagation();
-        setSpaceSwitcherOpen(true);
-      }
-
-      if (event.key === 'Escape') {
-        setSpaceSwitcherOpen(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, []);
-
-  if (bridgeError) {
-    return <DiagnosticScreen title="Desktop bridge missing" message={bridgeError} />;
-  }
-
   if (bootError) {
-    return <DiagnosticScreen title="Renderer boot failed" message={bootError} />;
+    return <BootScreen message={bootError} error />;
+  }
+  if (!ready) {
+    return <BootScreen message="Starting…" />;
   }
 
-  if (!hydrated) {
-    return <DiagnosticScreen title="Starting Lookout" message="Loading local state and preparing project spaces..." loading />;
-  }
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+  const classes = ['shell', elevated ? 'is-admin' : '', windowKind === 'quake' ? 'is-quake' : '', sidebarCollapsed ? 'is-rail' : ''].filter(Boolean).join(' ');
 
   return (
-    <div className="app-shell">
-      <div className="app-shell__content">
-        <TabStrip
-          activeSpaceId={activeSpace?.id ?? null}
-          onClose={(spaceId) => void closeSpace(spaceId)}
-          onConfigure={openEditConfigurator}
-          onCreate={() => openCreateConfigurator()}
-          onOpenSwitcher={() => setSpaceSwitcherOpen(true)}
-          onOpenSettings={() => setView('settings')}
-          onRename={renameSpace}
-          onSelect={activateSpace}
-          onTogglePinned={toggleSpacePinned}
-          showPinnedTabsOnly={settings.showPinnedTabsOnly}
-          spaces={openSpaces}
-        />
-
-        <div className="app-shell__workspace">
-          {warnings.length ? (
-            <div className="warning-stack">
-              {warnings.map((warning) => (
-                <div key={warning} className="warning-banner">
-                  <div className="warning-banner__copy">
-                    <AlertTriangle size={16} />
-                    <span>{warning}</span>
-                  </div>
-                  <button className="icon-button" onClick={() => clearWarning(warning)} type="button">
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {showUpdateBanner ? (
-            <div className="update-banner">
-              <div className="update-banner__copy">
-                <Download size={16} />
-                <div>
-                  <strong>
-                    {appUpdateState.phase === 'downloaded'
-                      ? `Update ${appUpdateState.availableVersion ?? ''} is ready`
-                      : `Update ${appUpdateState.availableVersion ?? ''} is available`}
-                  </strong>
-                  <span>
-                    {appUpdateState.phase === 'downloaded'
-                      ? 'Restart Lookout to install the downloaded update.'
-                      : 'A newer version was found automatically when the app opened.'}
-                  </span>
-                </div>
-              </div>
-              <div className="update-banner__actions">
-                {appUpdateState.phase === 'available' ? (
-                  <button
-                    className="button button--primary button--compact"
-                    onClick={() => void window.lookout.downloadAppUpdate()}
-                    type="button"
-                  >
-                    Download update
-                  </button>
-                ) : null}
-                {appUpdateState.phase === 'downloaded' ? (
-                  <button
-                    className="button button--primary button--compact"
-                    onClick={() => void window.lookout.installAppUpdate()}
-                    type="button"
-                  >
-                    Restart to install
-                  </button>
-                ) : null}
-                <button
-                  className="button button--ghost button--compact"
-                  onClick={() => setDismissedUpdateKey(updateNoticeKey)}
-                  type="button"
-                >
-                  Later
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          <main className="app-shell__main">
-            {view === 'settings' ? (
+    <div className={classes} style={{ ['--sidebar-w' as string]: `${sidebarCollapsed ? 48 : sidebarWidth}px` }}>
+      <Sidebar />
+      <main className="shell__main">
+        <TopBar />
+        <div className="shell__stage">
+          {activeTab ? <PaneGrid key={activeTab.id} tab={activeTab} /> : null}
+          {settingsOpen ? (
+            <div className="shell__settings">
               <SettingsView />
-            ) : view === 'configurator' || !activeSpace ? (
-              <WorkspaceConfigurator />
-            ) : (
-              <WorkspaceView space={activeSpace} />
-            )}
-          </main>
+            </div>
+          ) : null}
         </div>
-
-        {/* Rendered after every drag-region element so the no-drag subtraction
-            is applied last during Chromium's DOM-order region computation. */}
-        <WindowControls />
-
-        {spaceSwitcherOpen ? (
-          <SpaceSwitcher
-            activeSpaceId={activeSpaceId}
-            onClose={() => setSpaceSwitcherOpen(false)}
-            onSelect={(space) => {
-              if (space.isOpen) {
-                activateSpace(space.id);
-                setSpaceSwitcherOpen(false);
-                return;
-              }
-
-              void reopenSpace(space.id).then(() => setSpaceSwitcherOpen(false));
-            }}
-            spaces={projectSpaces}
-          />
-        ) : null}
-      </div>
+      </main>
+      <PaneDragLayer />
+      <Overlays />
     </div>
   );
 }
 
-function WindowControls() {
+function BootScreen({ message, error = false }: { message: string; error?: boolean }) {
   return (
-    <div className="window-controls no-drag">
-      <button className="window-control-button" onClick={() => void window.lookout.minimizeWindow()} title="Minimize" type="button">
-        <Minus size={14} />
-      </button>
-      <button
-        className="window-control-button"
-        onClick={() => void window.lookout.toggleMaximizeWindow()}
-        title="Maximize"
-        type="button"
-      >
-        <Square size={11} />
-      </button>
-      <button
-        className="window-control-button window-control-button--close"
-        onClick={() => void window.lookout.closeWindow()}
-        title="Close"
-        type="button"
-      >
-        <X size={14} />
-      </button>
+    <div className="boot drag">
+      <img alt="" className="boot__logo" src={lookoutLogo} />
+      <span className={error ? 'boot__error' : 'boot__message'}>{message}</span>
     </div>
   );
 }
 
-function SpaceSwitcher({
-  spaces,
-  activeSpaceId,
-  onClose,
-  onSelect,
-}: {
-  spaces: ProjectSpace[];
-  activeSpaceId: string | null;
-  onClose: () => void;
-  onSelect: (space: ProjectSpace) => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const deferredQuery = useDeferredValue(query);
-
-  const orderedSpaces = useMemo(
-    () =>
-      [...spaces].sort((left, right) => {
-        if (left.isOpen !== right.isOpen) {
-          return left.isOpen ? -1 : 1;
-        }
-
-        if (left.pinned !== right.pinned) {
-          return left.pinned ? -1 : 1;
-        }
-
-        return right.updatedAt.localeCompare(left.updatedAt);
-      }),
-    [spaces],
-  );
-
-  const filteredSpaces = useMemo(() => {
-    const normalizedQuery = deferredQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return orderedSpaces.slice(0, 12);
-    }
-
-    return orderedSpaces
-      .filter((space) => {
-        const label = `${space.displayName} ${space.rootPath}`.toLowerCase();
-        return label.includes(normalizedQuery);
-      })
-      .slice(0, 12);
-  }, [deferredQuery, orderedSpaces]);
-  const boundedSelectedIndex = filteredSpaces.length ? Math.min(selectedIndex, filteredSpaces.length - 1) : 0;
-
-  return (
-    <div
-      className="space-switcher-overlay"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <section className="space-switcher">
-        <div className="space-switcher__search">
-          <Search size={15} />
-          <input
-            autoFocus
-            className="space-switcher__input"
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSelectedIndex(0);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                setSelectedIndex((current) => Math.min(current + 1, Math.max(filteredSpaces.length - 1, 0)));
-              }
-
-              if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                setSelectedIndex((current) => Math.max(current - 1, 0));
-              }
-
-              if (event.key === 'Enter' && filteredSpaces[boundedSelectedIndex]) {
-                event.preventDefault();
-                onSelect(filteredSpaces[boundedSelectedIndex]);
-              }
-
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                onClose();
-              }
-            }}
-            placeholder="Jump to a project space by name or path"
-            value={query}
-          />
-          <kbd>Esc</kbd>
-        </div>
-
-        <div className="space-switcher__list">
-          {filteredSpaces.length ? (
-            filteredSpaces.map((space, index) => {
-              const isActive = space.id === activeSpaceId;
-              const isSelected = index === boundedSelectedIndex;
-
-              return (
-                <button
-                  key={space.id}
-                  className={`space-switcher__item ${isSelected ? 'is-selected' : ''}`}
-                  onClick={() => onSelect(space)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  type="button"
-                >
-                  <div className="space-switcher__item-copy">
-                    <strong>{space.displayName}</strong>
-                    <span>{space.rootPath}</span>
-                  </div>
-                  <div className="space-switcher__item-meta">
-                    {space.pinned ? <span className="space-switcher__pill">Pinned</span> : null}
-                    <span className="space-switcher__pill">{space.isOpen ? 'Open' : 'Saved'}</span>
-                    {isActive ? <span className="space-switcher__pill space-switcher__pill--accent">Active</span> : null}
-                  </div>
-                </button>
-              );
-            })
-          ) : (
-            <div className="space-switcher__empty">No spaces matched that search.</div>
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function DiagnosticScreen({
-  title,
-  message,
-  loading = false,
-}: {
-  title: string;
-  message: string;
-  loading?: boolean;
-}) {
-  return (
-    <div className="diagnostic-shell">
-      <section className="diagnostic-card">
-        <div className="diagnostic-card__icon">{loading ? <RefreshCw className="spin" size={26} /> : <FolderKanban size={26} />}</div>
-        <div className="diagnostic-card__copy">
-          <span className="eyebrow">Lookout</span>
-          <h1>{title}</h1>
-          <p>{message}</p>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-class RendererErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = {
-    error: null as Error | null,
-  };
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Lookout renderer crashed', error, errorInfo);
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Lookout renderer crashed', error, info);
   }
 
   render() {
     if (this.state.error) {
-      return <DiagnosticScreen title="Renderer crashed" message={this.state.error.message} />;
+      return (
+        <div className="boot drag">
+          <img alt="" className="boot__logo" src={lookoutLogo} />
+          <span className="boot__error">Something broke: {this.state.error.message}</span>
+          <button className="btn no-drag" onClick={() => window.location.reload()} type="button">
+            Reload window (shells keep running)
+          </button>
+        </div>
+      );
     }
-
     return this.props.children;
   }
 }
-
-export default App;

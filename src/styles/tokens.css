@@ -1,0 +1,168 @@
+/*
+ * Lookout design tokens — "night watch".
+ * Flat graphite surfaces, one ember accent, compact pro-tool density.
+ * Rules: no gradients, no glows, no blur, no hover lifts. Status colours are
+ * semantic only (ok / error / warn / info); ember is the only accent.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0b0d11;
+  --chrome: #0e1115;
+  --surface-1: #13171d;
+  --surface-2: #191e26;
+  --surface-3: #20262f;
+  --surface-hover: #1c222b;
+  --surface-active: #232a35;
+  --line: #1c2129;
+  --line-strong: #29303b;
+
+  --text: #d6dde8;
+  --text-strong: #eef2f7;
+  --text-muted: #8a94a4;
+  --text-faint: #5b6575;
+
+  --accent: #f0883e;
+  --accent-strong: #ff9a52;
+  --accent-soft: rgba(240, 136, 62, 0.13);
+  --accent-line: rgba(240, 136, 62, 0.55);
+  --accent-text: #ffb27a;
+
+  --ok: #5fbf7a;
+  --error: #f26d78;
+  --warn: #e8c26a;
+  --info: #6aa6f8;
+  --admin: #e8c26a;
+
+  --scrim: rgba(4, 6, 9, 0.62);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--line-strong);
+}
+
+/*
+ * Lighter dark variants (Settings → Appearance → Dark theme). Same ladder and
+ * accent as Night; only the surfaces, lines and text move. Keep --bg and
+ * --chrome in sync with src/shared/themes.ts (window background, caption buttons).
+ */
+:root[data-theme='dark'][data-dark-theme='dusk'] {
+  --bg: #16191e;
+  --chrome: #1a1d23;
+  --surface-1: #1f232a;
+  --surface-2: #252a32;
+  --surface-3: #2d333c;
+  --surface-hover: #23282f;
+  --surface-active: #2b313b;
+  --line: #272c34;
+  --line-strong: #343b46;
+
+  --text: #dae0ea;
+  --text-strong: #f0f3f8;
+  --text-muted: #949eae;
+  --text-faint: #687283;
+
+  --scrim: rgba(6, 8, 11, 0.58);
+}
+
+:root[data-theme='dark'][data-dark-theme='slate'] {
+  --bg: #22272e;
+  --chrome: #272d35;
+  --surface-1: #2d333b;
+  --surface-2: #343a43;
+  --surface-3: #3d444e;
+  --surface-hover: #323841;
+  --surface-active: #3a414b;
+  --line: #363c45;
+  --line-strong: #444c57;
+
+  --text: #cdd5df;
+  --text-strong: #e9eef3;
+  --text-muted: #98a3b1;
+  --text-faint: #717c8a;
+
+  --accent-soft: rgba(240, 136, 62, 0.15);
+  --scrim: rgba(10, 13, 17, 0.55);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--line-strong);
+}
+
+:root[data-theme='dark'][data-dark-theme='ash'] {
+  --bg: #262624;
+  --chrome: #2b2b29;
+  --surface-1: #30302d;
+  --surface-2: #373733;
+  --surface-3: #40403b;
+  --surface-hover: #353531;
+  --surface-active: #3e3e39;
+  --line: #393935;
+  --line-strong: #484843;
+
+  --text: #e4e0d7;
+  --text-strong: #f6f3ed;
+  --text-muted: #a5a095;
+  --text-faint: #7d796f;
+
+  --accent-soft: rgba(240, 136, 62, 0.15);
+  --scrim: rgba(12, 12, 10, 0.55);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--line-strong);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #fbfbfa;
+  --chrome: #f3f3f1;
+  --surface-1: #ffffff;
+  --surface-2: #f1f1ee;
+  --surface-3: #e8e8e4;
+  --surface-hover: #ebebe7;
+  --surface-active: #e2e2dd;
+  --line: #e4e4df;
+  --line-strong: #d3d3cd;
+
+  --text: #1d2129;
+  --text-strong: #0e1116;
+  --text-muted: #5d6572;
+  --text-faint: #8f96a1;
+
+  --accent: #d9681c;
+  --accent-strong: #c25810;
+  --accent-soft: rgba(217, 104, 28, 0.1);
+  --accent-line: rgba(217, 104, 28, 0.55);
+  --accent-text: #b4530f;
+
+  --ok: #2f9a52;
+  --error: #d23f4c;
+  --warn: #b98a12;
+  --info: #2f6fd1;
+  --admin: #b98a12;
+
+  --scrim: rgba(20, 22, 26, 0.28);
+  --shadow-pop: 0 12px 28px rgba(20, 22, 26, 0.16), 0 0 0 1px var(--line-strong);
+}
+
+:root {
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Cascadia Code', Consolas, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 12.5px;
+  --text-lg: 14px;
+  --text-xl: 17px;
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
+
+  --control-h: 26px;
+  --control-h-sm: 22px;
+  --titlebar-h: 34px;
+  --pane-header-h: 24px;
+
+  /* Width reserved for the native Windows caption buttons (titleBarOverlay). */
+  --caption-w: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --fast: 90ms;
+}

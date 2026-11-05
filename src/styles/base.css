@@ -1,0 +1,270 @@
+/* Base elements and shared primitives (buttons, inputs, kbd, chips). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.4;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 1px solid var(--accent-line);
+  outline-offset: 1px;
+}
+
+/* Scrollbars: thin and quiet everywhere except inside terminals (xterm owns those). */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+:hover::-webkit-scrollbar-thumb {
+  background-color: var(--line-strong);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* ---- Buttons --------------------------------------------------------------- */
+
+.btn {
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: default;
+  display: inline-flex;
+  gap: 6px;
+  height: var(--control-h);
+  justify-content: center;
+  padding: 0 10px;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--surface-3);
+}
+.btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a0d03;
+  font-weight: 600;
+}
+.btn--primary:hover {
+  background: var(--accent-strong);
+}
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn--ghost:hover {
+  background: var(--surface-hover);
+}
+.btn--danger {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--error);
+}
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+}
+.btn--sm {
+  height: var(--control-h-sm);
+  padding: 0 8px;
+  font-size: var(--text-sm);
+}
+
+.icon-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: default;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+  width: 24px;
+}
+.icon-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.icon-btn.is-on {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.icon-btn--sm {
+  height: 20px;
+  width: 20px;
+}
+.icon-btn--danger:hover {
+  color: var(--error);
+}
+
+/* ---- Inputs ---------------------------------------------------------------- */
+
+.input,
+.select,
+.textarea {
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  height: var(--control-h);
+  min-width: 0;
+  outline: none;
+  padding: 0 8px;
+  user-select: text;
+  width: 100%;
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--accent-line);
+}
+.input--mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.textarea {
+  height: auto;
+  min-height: 72px;
+  padding: 6px 8px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.checkbox {
+  accent-color: var(--accent);
+  height: 14px;
+  margin: 0;
+  width: 14px;
+}
+
+/* ---- Small primitives ------------------------------------------------------ */
+
+kbd,
+.kbd {
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 14px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.chip {
+  align-items: center;
+  background: var(--surface-2);
+  border-radius: 999px;
+  color: var(--text-muted);
+  display: inline-flex;
+  font-size: var(--text-xs);
+  gap: 4px;
+  height: 18px;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+.chip--accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.chip--ok {
+  color: var(--ok);
+}
+.chip--error {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+}
+
+.dot {
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 6px;
+  width: 6px;
+}
+.dot--accent {
+  background: var(--accent);
+}
+.dot--ok {
+  background: var(--ok);
+}
+.dot--error {
+  background: var(--error);
+}
+.dot--muted {
+  background: var(--text-faint);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+.faint {
+  color: var(--text-faint);
+}
+.truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,5 @@
+# Scripts bash reads must keep LF line endings, even in a Windows checkout. The
+# release build runs on a Windows runner with core.autocrlf=true, and bash fails on
+# CRLF (resources/shell-integration/lookout.bash is Git Bash's --init-file).
+*.bash text eol=lf
+*.sh text eol=lf

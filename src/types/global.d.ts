@@ -1,16 +1,8 @@
-import type { LookoutApi } from './electron-api';
-
-interface LocalFontData {
-  family: string;
-  fullName?: string;
-  postscriptName?: string;
-  style?: string;
-}
+import type { LookoutBridge } from '../shared/ipc';
 
 declare global {
   interface Window {
-    lookout: LookoutApi;
-    queryLocalFonts?: () => Promise<LocalFontData[]>;
+    lookout: LookoutBridge;
   }
 }
 

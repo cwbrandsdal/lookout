@@ -24,3 +24,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local agent settings and screenshots pasted into the repo root
+.claude/settings.local.json
+/clipboard-*.png
+/snip-*.png
+
+# Native default-terminal helper build output
+native/handoff/bin/
+native/handoff/build/
+

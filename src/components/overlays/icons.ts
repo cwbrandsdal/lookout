@@ -1,0 +1,115 @@
+// Menu items carry icons as strings (MenuItem.icon); this resolves them to
+// lucide components. Accepts semantic names ('split-right') and lucide names
+// ('Columns2'), case- and separator-insensitively.
+
+import {
+  AppWindow,
+  Ban,
+  ClipboardCopy,
+  ClipboardPaste,
+  Code,
+  Copy,
+  CopyPlus,
+  Eraser,
+  FileText,
+  Folder,
+  FolderKanban,
+  FolderOpen,
+  LayoutGrid,
+  Maximize2,
+  Palette,
+  Pencil,
+  Play,
+  Plus,
+  Radio,
+  RotateCcw,
+  Rows2,
+  Save,
+  Search,
+  Settings,
+  ShieldCheck,
+  SquareArrowOutUpRight,
+  SquareTerminal,
+  TextSelect,
+  Trash2,
+  X,
+  Columns2,
+  type LucideIcon,
+} from 'lucide-react';
+
+const ICONS: Record<string, LucideIcon> = {
+  copy: Copy,
+  paste: ClipboardPaste,
+  clipboardpaste: ClipboardPaste,
+  selectall: TextSelect,
+  textselect: TextSelect,
+  search: Search,
+  find: Search,
+  splitright: Columns2,
+  columns2: Columns2,
+  splitdown: Rows2,
+  rows2: Rows2,
+  zoom: Maximize2,
+  maximize2: Maximize2,
+  newtab: SquareArrowOutUpRight,
+  movetotab: SquareArrowOutUpRight,
+  squarearrowoutupright: SquareArrowOutUpRight,
+  broadcast: Radio,
+  radio: Radio,
+  folder: Folder,
+  folderopen: FolderOpen,
+  explorer: FolderOpen,
+  code: Code,
+  vscode: Code,
+  clipboardcopy: ClipboardCopy,
+  copypath: ClipboardCopy,
+  filetext: FileText,
+  output: FileText,
+  eraser: Eraser,
+  clear: Eraser,
+  restart: RotateCcw,
+  rotateccw: RotateCcw,
+  close: X,
+  x: X,
+  pencil: Pencil,
+  rename: Pencil,
+  palette: Palette,
+  color: Palette,
+  duplicate: CopyPlus,
+  copyplus: CopyPlus,
+  save: Save,
+  window: AppWindow,
+  appwindow: AppWindow,
+  shield: ShieldCheck,
+  admin: ShieldCheck,
+  shieldcheck: ShieldCheck,
+  terminal: SquareTerminal,
+  squareterminal: SquareTerminal,
+  workspace: FolderKanban,
+  folderkanban: FolderKanban,
+  grid: LayoutGrid,
+  layoutgrid: LayoutGrid,
+  play: Play,
+  snippet: Play,
+  trash: Trash2,
+  trash2: Trash2,
+  delete: Trash2,
+  plus: Plus,
+  add: Plus,
+  settings: Settings,
+  none: Ban,
+  ban: Ban,
+};
+
+export function resolveIcon(name: string | undefined): LucideIcon | undefined {
+  return name ? ICONS[name.toLowerCase().replace(/[^a-z0-9]/g, '')] : undefined;
+}
+
+/** Profile icons are short glyphs (emoji, Nerd Font, 1–2 letters); anything longer is a path we can't render. */
+export function profileGlyph(icon: string | undefined): string | undefined {
+  if (!icon) {
+    return undefined;
+  }
+  const trimmed = icon.trim();
+  return trimmed && [...trimmed].length <= 2 && !/[\\/.]/.test(trimmed) ? trimmed : undefined;
+}

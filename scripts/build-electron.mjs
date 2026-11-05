@@ -4,7 +4,12 @@ const watchMode = process.argv.includes('--watch');
 
 const sharedOptions = {
   bundle: true,
-  entryPoints: ['electron/main.ts', 'electron/preload.ts'],
+  // main + preload run in Electron; pty-host runs as an Electron utilityProcess.
+  entryPoints: {
+    main: 'electron/main.ts',
+    preload: 'electron/preload.ts',
+    'pty-host': 'electron/pty-host/host.ts',
+  },
   external: ['electron', 'node-pty'],
   format: 'cjs',
   logLevel: 'info',

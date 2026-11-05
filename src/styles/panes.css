@@ -1,0 +1,262 @@
+/*
+ * Spatial pane editing: edge anchors to split, live previews for docking and
+ * swapping while dragging, magnetic dividers with a size badge.
+ * Flat and calm: ember outlines/fills only, no glows or lifts.
+ */
+
+/* ---- Pane header: the drag handle --------------------------------------- */
+
+.pane__header {
+  cursor: grab;
+  touch-action: none;
+}
+.pane__header:active {
+  cursor: grabbing;
+}
+.pane__grip {
+  color: var(--text-faint);
+  flex: 0 0 auto;
+  margin-left: -3px;
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+}
+.pane__header:hover .pane__grip {
+  opacity: 1;
+}
+
+html.is-pane-dragging,
+html.is-pane-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.pane.is-drag-source .pane__body {
+  opacity: 0.35;
+}
+.pane.is-drag-source {
+  border-style: dashed;
+}
+
+/* ---- Edge anchors -------------------------------------------------------- */
+
+.split-anchor {
+  align-items: center;
+  animation: anchor-in 120ms var(--ease);
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  display: flex;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  width: 24px;
+  z-index: 7;
+}
+.split-anchor:hover,
+.split-anchor:focus-visible {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a0d03;
+}
+/* Inside the pane (it clips), clear of the scrollbar on the right. */
+.split-anchor--left {
+  left: 6px;
+  top: calc(50% - 12px);
+}
+.split-anchor--right {
+  right: 20px;
+  top: calc(50% - 12px);
+}
+.split-anchor--up {
+  left: calc(50% - 12px);
+  top: 5px;
+}
+.split-anchor--down {
+  bottom: 5px;
+  left: calc(50% - 12px);
+}
+@keyframes anchor-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* What a click on an anchor will create; shown while the anchor is hovered.
+   Pure CSS on purpose, so no "hovered" state can get stuck in React. */
+.split-preview {
+  align-items: center;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px dashed var(--accent-line);
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  position: absolute;
+  visibility: hidden;
+  z-index: 6;
+}
+.split-anchor:hover + .split-preview,
+.split-anchor:focus-visible + .split-preview {
+  visibility: visible;
+}
+.split-preview--left {
+  bottom: 4px;
+  left: 4px;
+  top: 4px;
+  width: calc(50% - 6px);
+}
+.split-preview--right {
+  bottom: 4px;
+  right: 4px;
+  top: 4px;
+  width: calc(50% - 6px);
+}
+.split-preview--up {
+  height: calc(50% - 6px);
+  left: 4px;
+  right: 4px;
+  top: 4px;
+}
+.split-preview--down {
+  bottom: 4px;
+  height: calc(50% - 6px);
+  left: 4px;
+  right: 4px;
+}
+.split-preview__label,
+.drop-preview__label {
+  background: var(--surface-1);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 10px;
+}
+
+/* ---- Drop previews while dragging a pane ------------------------------------ */
+
+.drop-preview {
+  align-items: center;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  position: absolute;
+  transition:
+    left 90ms var(--ease),
+    right 90ms var(--ease),
+    top 90ms var(--ease),
+    bottom 90ms var(--ease),
+    width 90ms var(--ease),
+    height 90ms var(--ease);
+  z-index: 8;
+}
+.drop-preview--left {
+  bottom: 4px;
+  left: 4px;
+  top: 4px;
+  width: calc(50% - 6px);
+}
+.drop-preview--right {
+  bottom: 4px;
+  right: 4px;
+  top: 4px;
+  width: calc(50% - 6px);
+}
+.drop-preview--up {
+  height: calc(50% - 6px);
+  left: 4px;
+  right: 4px;
+  top: 4px;
+}
+.drop-preview--down {
+  bottom: 4px;
+  height: calc(50% - 6px);
+  left: 4px;
+  right: 4px;
+}
+.drop-preview--center {
+  inset: 4px;
+}
+.drop-preview--files {
+  color: var(--accent-text);
+  font-size: var(--text-sm);
+  inset: 8px;
+}
+
+/* ---- The chip that follows the pointer -------------------------------------- */
+
+.drag-ghost {
+  align-items: center;
+  background: var(--surface-1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  gap: 8px;
+  max-width: 280px;
+  padding: 6px 10px;
+  pointer-events: none;
+  position: fixed;
+  z-index: 60;
+}
+.drag-ghost__glyph {
+  color: var(--accent);
+}
+.drag-ghost__title {
+  color: var(--text-strong);
+  font-weight: 500;
+  max-width: 120px;
+}
+.drag-ghost__hint {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.drag-ghost.has-target .drag-ghost__hint {
+  color: var(--accent-text);
+}
+
+/* ---- Divider resizing --------------------------------------------------------- */
+
+.pane__size {
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--text-sm);
+  left: 50%;
+  padding: 3px 9px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9;
+}
+
+/* ---- Sidebar as a drop target --------------------------------------------- */
+
+.tabrow-drop-new {
+  align-items: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-faint);
+  display: flex;
+  font-size: var(--text-xs);
+  gap: 6px;
+  height: 34px;
+  justify-content: center;
+  margin-top: 4px;
+}
+.tabrow-drop-new.is-target {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-text);
+}
