@@ -10,6 +10,7 @@ describe('createDefaultSettings', () => {
     expect(defaults.colorScheme).toBe('Lookout Night');
     expect(defaults.terminal).toMatchObject({ scrollback: 10_000, cursorStyle: 'bar', cursorBlink: true, rightClick: 'copyPaste', closeOnExit: 'graceful' });
     expect(defaults.terminal.bell).toEqual({ sound: false, visual: true, taskbar: true });
+    expect(defaults.terminal.autoSubmitSingleLinePaste).toBe(false);
     expect(defaults.window).toMatchObject({ newTabDirectory: 'inherit', restoreSession: true, keepRunningInTray: true, summonHotkey: null });
     expect(defaults.quake).toEqual({ enabled: true, hotkey: 'Super+`', heightPercent: 45 });
     expect(defaults.profiles.map((profile) => profile.id)).toEqual(['pwsh', 'windows-powershell', 'cmd']);
@@ -34,6 +35,7 @@ describe('sanitizeSettings', () => {
     expect(warnings).toEqual([]);
     expect(settings.font).toMatchObject({ face: 'Cascadia Mono', size: 15, lineHeight: 1.1 });
     expect(settings.terminal.copyOnSelect).toBe(true);
+    expect(settings.terminal.autoSubmitSingleLinePaste).toBe(false);
     expect(settings.terminal.scrollback).toBe(10_000);
     expect(settings.quake.heightPercent).toBe(60);
     expect(settings.version).toBe(2);
@@ -69,6 +71,18 @@ describe('sanitizeSettings', () => {
 
   it('rounds integer settings', () => {
     expect(sanitizeSettings({ terminal: { scrollback: 1234.6 } }).settings.terminal.scrollback).toBe(1235);
+  });
+
+  it('keeps the single-line paste preference and rejects invalid values', () => {
+    for (const value of [true, false]) {
+      const { settings, warnings } = sanitizeSettings({ terminal: { autoSubmitSingleLinePaste: value } });
+      expect(settings.terminal.autoSubmitSingleLinePaste).toBe(value);
+      expect(warnings).toEqual([]);
+    }
+
+    const { settings, warnings } = sanitizeSettings({ terminal: { autoSubmitSingleLinePaste: 'true' } });
+    expect(settings.terminal.autoSubmitSingleLinePaste).toBe(false);
+    expect(warnings.some((warning) => warning.includes('terminal.autoSubmitSingleLinePaste'))).toBe(true);
   });
 
   it('drops invalid profiles, renames duplicate ids and keeps optional fields', () => {

@@ -18,6 +18,7 @@ import type { LaunchSpec, SessionInfo } from '../shared/host-protocol';
 import type { LookoutSettings, ProfileDefinition } from '../shared/settings';
 import { HostClient } from './host-client';
 import { createFileLinkProvider, type FileLinkTarget } from './links';
+import { preparePaste } from './paste';
 import { fontFamily, resolveAppTheme, resolveScheme, schemeToXtermTheme } from './theme';
 import { isLightScheme } from '../shared/color-schemes';
 import { Win32InputEncoder } from './win32-input';
@@ -1084,7 +1085,7 @@ export class TerminalManager {
       safe = confirmed;
     }
 
-    pane.term.paste(safe);
+    pane.term.paste(preparePaste(safe, this.settings.terminal.autoSubmitSingleLinePaste));
     pane.term.focus();
   }
 

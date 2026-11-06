@@ -60,6 +60,9 @@ export function TerminalSection() {
         <Row id="terminal.middleClickPaste">
           {(id) => <Switch id={id} checked={terminal.middleClickPaste} onChange={(value) => save((draft) => { draft.terminal.middleClickPaste = value; })} />}
         </Row>
+        <Row id="terminal.autoSubmitSingleLinePaste">
+          {(id) => <Switch id={id} checked={terminal.autoSubmitSingleLinePaste} onChange={(value) => save((draft) => { draft.terminal.autoSubmitSingleLinePaste = value; })} />}
+        </Row>
         <Row id="terminal.warnMultilinePaste">
           {(id) => <Switch id={id} checked={terminal.warnMultilinePaste} onChange={(value) => save((draft) => { draft.terminal.warnMultilinePaste = value; })} />}
         </Row>

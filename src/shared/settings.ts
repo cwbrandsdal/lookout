@@ -115,6 +115,8 @@ export interface TerminalBehaviorSettings {
   middleClickPaste: boolean;
   wordSeparators: string;
   bell: BellSettings;
+  /** Keep trailing line breaks on single-line pastes, allowing immediate submission. */
+  autoSubmitSingleLinePaste: boolean;
   warnMultilinePaste: boolean;
   warnLargePasteBytes: number;
   linkRequiresCtrl: boolean;

@@ -74,6 +74,7 @@ export const ROWS = {
   'terminal.trimTrailingWhitespace': { section: 'terminal', group: 'Clipboard', label: 'Trim trailing whitespace', description: 'Strip spaces at line ends when copying.', keywords: 'copy' },
   'terminal.rightClick': { section: 'terminal', group: 'Clipboard', label: 'Right-click', description: 'Copy the selection or paste, or open the context menu.', keywords: 'mouse context menu' },
   'terminal.middleClickPaste': { section: 'terminal', group: 'Clipboard', label: 'Middle-click paste', keywords: 'mouse' },
+  'terminal.autoSubmitSingleLinePaste': { section: 'terminal', group: 'Clipboard', label: 'Auto-submit single-line paste', description: 'Let a trailing line break submit a pasted single-line command. Off requires pressing Enter.', keywords: 'send execute run newline' },
   'terminal.warnMultilinePaste': { section: 'terminal', group: 'Clipboard', label: 'Warn on multi-line paste', description: 'Confirm before pasting text that would run several commands.', keywords: 'newline' },
   'terminal.warnLargePasteBytes': { section: 'terminal', group: 'Clipboard', label: 'Warn on large paste', description: 'Confirm pastes larger than this; 0 turns it off.', keywords: 'size bytes' },
   'terminal.wordSeparators': { section: 'terminal', group: 'Selection and links', label: 'Word separators', description: 'Characters that end a double-click selection.', keywords: 'delimiters double click' },

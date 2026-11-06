@@ -57,6 +57,12 @@ Lookout is a Windows terminal app meant to replace Windows Terminal. It is built
 
 Every shortcut can be changed under Settings → Keyboard or in `settings.json`.
 
+## Pasting
+
+Single-line pastes wait for you to press Enter by default: trailing line breaks are removed so a copied command does not run immediately. To keep those line breaks, turn on **Settings → Terminal → Clipboard → Auto-submit single-line paste**, or set `terminal.autoSubmitSingleLinePaste` to `true` in `settings.json`.
+
+Multi-line pastes keep their line breaks and follow the existing **Warn on multi-line paste** setting. The new setting defaults to off for existing installations as well.
+
 ## Command line
 
 Turn on **Settings → Integrations → `lookout` command on PATH**, then:
