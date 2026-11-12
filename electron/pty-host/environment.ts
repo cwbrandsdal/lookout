@@ -44,22 +44,42 @@ export interface RegistryValue {
 }
 
 // `    Name    REG_TYPE    value` (the value part is absent for empty strings).
-const VALUE_LINE = /^ {4}(.+?) {4}(REG_[A-Z0-9_]+)(?: {4}(.*))?$/;
+// `s`: a value that contained CRLF ends its first line with a stray CR.
+const VALUE_LINE = /^ {4}(.+?) {4}(REG_[A-Z0-9_]+)(?: {4}(.*))?$/s;
 
-/** Parses `reg.exe query <key>` output. Only string values are environment variables. */
+/**
+ * Parses `reg.exe query <key>` output. Only string values are environment variables.
+ *
+ * reg.exe prints line breaks inside a value as-is (an LF as CRLF), so a value
+ * can span several lines; e.g. an installer that appended "\n  C:\tools" to
+ * the user Path. Lines that are not a new value continue the previous one, so
+ * the value arrives whole, as Windows Terminal (which reads the registry
+ * directly) sees it, instead of losing everything after the break.
+ */
 export function parseRegQuery(output: string): RegistryValue[] {
   const values: RegistryValue[] = [];
+  let last: RegistryValue | null = null;
+  let blankLines = 0;
   for (const line of output.split(/\r?\n/)) {
     const match = VALUE_LINE.exec(line);
-    if (!match) {
+    if (match) {
+      const [, name, type, value = ''] = match;
+      // `(Default)` (localized) is the key's unnamed value, not a variable.
+      last = (type === 'REG_SZ' || type === 'REG_EXPAND_SZ') && !/^\(.*\)$/.test(name) ? { name, type, value } : null;
+      if (last) {
+        values.push(last);
+      }
+    } else if (line === '') {
+      // A blank line inside a value, or the end of the values.
+      blankLines += 1;
       continue;
+    } else if (last && !line.startsWith('HKEY_')) {
+      last.value += '\n'.repeat(blankLines + 1) + line;
+    } else {
+      // The key header, or the subkey list after the values.
+      last = null;
     }
-    const [, name, type, value = ''] = match;
-    // `(Default)` (localized) is the key's unnamed value, not a variable.
-    if ((type !== 'REG_SZ' && type !== 'REG_EXPAND_SZ') || /^\(.*\)$/.test(name)) {
-      continue;
-    }
-    values.push({ name, type, value });
+    blankLines = 0;
   }
   return values;
 }

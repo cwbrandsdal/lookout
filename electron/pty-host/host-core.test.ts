@@ -511,6 +511,23 @@ describe('fresh environment', () => {
     ]);
   });
 
+  it('keeps values that contain line breaks whole', () => {
+    // Real reg.exe output: an LF inside a value prints as CRLF, a CRLF as CR CR LF.
+    const output = '\r\nHKEY_CURRENT_USER\\Environment\r\n'
+      + '    Path    REG_EXPAND_SZ    C:\\a;\r\n  C:\\Users\\c\\.local\\bin;C:\\docker\\bin\r\n'
+      + '    CrLf    REG_EXPAND_SZ    C:\\a;\r\r\n  C:\\b;C:\\c\r\n'
+      + '    Gap    REG_SZ    one\r\n\r\ntwo\r\n'
+      + '    Flags    REG_DWORD    0x1\r\n'
+      + '    After    REG_SZ    tail\r\n\r\n'
+      + 'HKEY_CURRENT_USER\\Environment\\Subkey\r\n';
+    expect(parseRegQuery(output)).toEqual([
+      { name: 'Path', type: 'REG_EXPAND_SZ', value: 'C:\\a;\n  C:\\Users\\c\\.local\\bin;C:\\docker\\bin' },
+      { name: 'CrLf', type: 'REG_EXPAND_SZ', value: 'C:\\a;\r\n  C:\\b;C:\\c' },
+      { name: 'Gap', type: 'REG_SZ', value: 'one\n\ntwo' },
+      { name: 'After', type: 'REG_SZ', value: 'tail' },
+    ]);
+  });
+
   it('expands values, joins PATH and keeps the process casing', () => {
     const env = mergeEnvironment(
       { SYSTEMROOT: 'C:\\Windows', USERPROFILE: 'C:\\Users\\Bjørn', PATH: 'C:\\stale', temp: 'C:\\old', KEEP: '1' },
