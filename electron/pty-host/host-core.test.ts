@@ -546,39 +546,108 @@ describe('fresh environment', () => {
   });
 
   it.runIf(process.platform === 'win32')('reads the real registry without changing who the user is', async () => {
-    const env = await new FreshEnvironment({ initialTimeoutMs: 10_000 }).get();
+    const env = await new FreshEnvironment({ readTimeoutMs: 10_000 }).get();
     const value = (name: string) => Object.entries(env).find(([key]) => key.toLowerCase() === name)?.[1];
     expect(value('username')).toBe(process.env.USERNAME);
     expect(value('userprofile')).toBe(process.env.USERPROFILE);
     expect(value('comspec')).toBeTruthy();
   });
 
-  it('waits only for the initial read and refreshes stale caches in the background', async () => {
-    let now = 0;
-    let reads = 0;
-    const gate: { release?: () => void } = {};
-    const environment = new FreshEnvironment({
-      ttlMs: 10_000,
-      initialTimeoutMs: 50,
-      now: () => now,
-      baseEnvironment: () => ({ Path: 'base' }),
-      query: async (key) => {
-        if (key.startsWith('HKLM')) {
-          reads += 1;
-          if (reads === 1) await new Promise<void>((resolve) => { gate.release = resolve; });
-          return `    Path    REG_SZ    system${reads}`;
+  /** A registry fake whose HKLM reads return `system<n>`, optionally held open or failing. */
+  function fakeRegistry() {
+    const registry = {
+      reads: 0,
+      hold: false,
+      fail: false,
+      release: () => {},
+      query: async (key: string): Promise<string> => {
+        if (!key.startsWith('HKLM')) {
+          return '';
         }
-        return '';
+        registry.reads += 1;
+        const read = registry.reads;
+        if (registry.hold) {
+          await new Promise<void>((resolve) => { registry.release = resolve; });
+        }
+        if (registry.fail) {
+          throw new Error('reg.exe failed');
+        }
+        return `    Path    REG_SZ    system${read}`;
       },
-    });
+    };
+    return registry;
+  }
 
-    expect(await environment.get()).toEqual({ Path: 'base' }); // Initial read timed out.
-    gate.release?.();
+  it('reads the registry again for a spawn once the last read is stale', async () => {
+    let now = 0;
+    const registry = fakeRegistry();
+    const environment = new FreshEnvironment({ ttlMs: 2_000, now: () => now, baseEnvironment: () => ({}), query: registry.query });
+
+    expect(await environment.get()).toEqual({ Path: 'system1' });
+    now = 1_000;
+    expect(await environment.get()).toEqual({ Path: 'system1' }); // Same burst: no new read.
+    now = 60_000;
+    // E.g. a tab opened after an install changed PATH: it must see the change, not the cache.
+    expect(await environment.get()).toEqual({ Path: 'system2' });
+    expect(registry.reads).toBe(2);
+  });
+
+  it('shares one read between concurrent spawns', async () => {
+    const registry = fakeRegistry();
+    const environment = new FreshEnvironment({ baseEnvironment: () => ({}), query: registry.query });
+    const envs = await Promise.all([environment.get(), environment.get(), environment.get()]);
+    expect(envs).toEqual([{ Path: 'system1' }, { Path: 'system1' }, { Path: 'system1' }]);
+    expect(registry.reads).toBe(1);
+  });
+
+  it('falls back to the process environment when the first read is slow', async () => {
+    const registry = fakeRegistry();
+    registry.hold = true;
+    const environment = new FreshEnvironment({ readTimeoutMs: 20, baseEnvironment: () => ({ Path: 'base' }), query: registry.query });
+
+    expect(await environment.get()).toEqual({ Path: 'base' });
+    registry.hold = false;
+    registry.release();
     await sleep(5);
     expect(await environment.get()).toEqual({ Path: 'system1' });
-    now = 20_000;
-    expect(await environment.get()).toEqual({ Path: 'system1' }); // Stale, served immediately.
+  });
+
+  it('uses the last good environment when a read is slow, without waiting on it twice', async () => {
+    let now = 0;
+    const warnings: string[] = [];
+    const registry = fakeRegistry();
+    const environment = new FreshEnvironment({
+      readTimeoutMs: 20,
+      now: () => now,
+      baseEnvironment: () => ({ Path: 'base' }),
+      query: registry.query,
+      log: (level, message) => { if (level === 'warn') warnings.push(message); },
+    });
+    expect(await environment.get()).toEqual({ Path: 'system1' });
+
+    now = 60_000;
+    registry.hold = true;
+    expect(await environment.get()).toEqual({ Path: 'system1' }); // Timed out.
+    expect(await environment.get()).toEqual({ Path: 'system1' }); // Same slow read: no second wait.
+    expect(warnings).toHaveLength(1);
+    expect(registry.reads).toBe(2);
+
+    registry.hold = false;
+    registry.release();
     await sleep(5);
     expect(await environment.get()).toEqual({ Path: 'system2' });
+  });
+
+  it('uses the last good environment when a read fails', async () => {
+    let now = 0;
+    const registry = fakeRegistry();
+    const environment = new FreshEnvironment({ now: () => now, baseEnvironment: () => ({ Path: 'base' }), query: registry.query });
+    expect(await environment.get()).toEqual({ Path: 'system1' });
+
+    now = 60_000;
+    registry.fail = true;
+    expect(await environment.get()).toEqual({ Path: 'system1' });
+    registry.fail = false;
+    expect(await environment.get()).toEqual({ Path: 'system3' }); // Retried on the next spawn.
   });
 });

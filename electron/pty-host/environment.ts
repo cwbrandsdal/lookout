@@ -33,8 +33,8 @@ const LOGON_VARIABLES = new Set([
   'sessionname',
 ]);
 
-const DEFAULT_TTL_MS = 10_000;
-const DEFAULT_INITIAL_TIMEOUT_MS = 1_500;
+const DEFAULT_TTL_MS = 2_000;
+const DEFAULT_READ_TIMEOUT_MS = 1_500;
 const REG_TIMEOUT_MS = 5_000;
 
 export interface RegistryValue {
@@ -202,10 +202,10 @@ function copyDefined(env: Record<string, string | undefined>): Environment {
 }
 
 export interface FreshEnvironmentOptions {
-  /** Cache lifetime; older caches are still served while a background refresh runs. */
+  /** How long a read counts as fresh, so a burst of spawns (restoring a window) shares one read. */
   ttlMs?: number;
-  /** How long the very first `get()` may wait for the initial registry read. */
-  initialTimeoutMs?: number;
+  /** How long a spawn may wait for a registry read before it falls back to the last good environment. */
+  readTimeoutMs?: number;
   /** Returns `reg.exe query` output for a key (injectable for tests). */
   query?: (key: string) => Promise<string>;
   /** Base environment the registry values are overlaid on. Defaults to `process.env`. */
@@ -215,18 +215,20 @@ export interface FreshEnvironmentOptions {
 }
 
 /**
- * Cached fresh environment. Only the initial read is ever waited on (bounded
- * by `initialTimeoutMs`); afterwards `get()` answers from the cache (or the
- * process environment if no read has succeeded yet) and refreshes stale
- * entries in the background.
+ * The environment for a new session. Like Windows Terminal, every spawn gets
+ * a fresh read of the registry (unless one finished within `ttlMs`), so a tab
+ * opened right after an install sees the new PATH. The wait is bounded by
+ * `readTimeoutMs`; a failed or slow read falls back to the last good
+ * environment (or the process environment), and spawns arriving while that
+ * slow read is still running do not wait on it again.
  */
 export class FreshEnvironment {
   private cache: { env: Environment; at: number } | null = null;
   private inflight: Promise<Environment | null> | null = null;
-  private initialWait: Promise<Environment | null> | null = null;
-  private initialDone = false;
+  /** `inflight` raced against `readTimeoutMs`, shared by every spawn waiting on that read. */
+  private bounded: Promise<Environment | null> | null = null;
   private readonly ttlMs: number;
-  private readonly initialTimeoutMs: number;
+  private readonly readTimeoutMs: number;
   private readonly query: (key: string) => Promise<string>;
   private readonly baseEnvironment: () => Record<string, string | undefined>;
   private readonly log: EnvironmentLog;
@@ -234,7 +236,7 @@ export class FreshEnvironment {
 
   constructor(options: FreshEnvironmentOptions = {}) {
     this.ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
-    this.initialTimeoutMs = options.initialTimeoutMs ?? DEFAULT_INITIAL_TIMEOUT_MS;
+    this.readTimeoutMs = options.readTimeoutMs ?? DEFAULT_READ_TIMEOUT_MS;
     this.query = options.query ?? ((key) => queryRegistryKey(key));
     this.baseEnvironment = options.baseEnvironment ?? processEnvironment;
     this.log = options.log ?? (() => {});
@@ -247,37 +249,36 @@ export class FreshEnvironment {
   }
 
   async get(): Promise<Environment> {
-    if (this.cache) {
-      if (this.now() - this.cache.at > this.ttlMs) {
-        void this.refresh();
-      }
+    if (this.cache && this.now() - this.cache.at <= this.ttlMs) {
       return { ...this.cache.env };
     }
-    if (!this.initialDone) {
-      this.initialWait ??= this.waitForInitialRead();
-      const env = await this.initialWait;
-      if (env) {
-        return { ...env };
-      }
-    } else {
-      void this.refresh();
+    const env = await this.readBounded();
+    if (env) {
+      return { ...env };
     }
-    return copyDefined(this.baseEnvironment());
+    return this.cache ? { ...this.cache.env } : copyDefined(this.baseEnvironment());
   }
 
-  private waitForInitialRead(): Promise<Environment | null> {
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        this.initialDone = true;
-        this.log('warn', `Reading the system environment took over ${this.initialTimeoutMs} ms; using the process environment`);
-        resolve(null);
-      }, this.initialTimeoutMs);
-      void this.refresh().then((env) => {
-        clearTimeout(timer);
-        this.initialDone = true;
-        resolve(env);
+  private readBounded(): Promise<Environment | null> {
+    if (!this.bounded) {
+      const read = this.refresh();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<null>((resolve) => {
+        timer = setTimeout(() => {
+          this.log('warn', `Reading the system environment took over ${this.readTimeoutMs} ms; using the last known environment`);
+          resolve(null);
+        }, this.readTimeoutMs);
       });
-    });
+      const bounded = Promise.race([read, timeout]);
+      this.bounded = bounded;
+      void read.then(() => {
+        clearTimeout(timer);
+        if (this.bounded === bounded) {
+          this.bounded = null;
+        }
+      });
+    }
+    return this.bounded;
   }
 
   private refresh(): Promise<Environment | null> {

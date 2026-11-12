@@ -29,6 +29,7 @@ Lookout is a Windows terminal app meant to replace Windows Terminal. It is built
 - **Windows integration:**
   - a drop-down (quake) terminal on Win+\`
   - the tray icon keeps Lookout warm for instant windows
+  - new tabs and panes read the system and user environment fresh, like Windows Terminal, so PATH changes from an install show up without quitting Lookout. **Restart pane** (command palette or the pane's context menu) relaunches an open shell in the same folder with the new environment.
   - a `lookout` CLI
   - "Open in Lookout" in Explorer
   - optional default-terminal handoff, so console windows from other apps open as Lookout tabs
